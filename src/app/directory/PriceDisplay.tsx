@@ -7,7 +7,7 @@ import {
   getBitcoinStockChartData
 } from "../../services/utils";
 import Select from "react-select";
-import Currencies, { Currency } from "../currencies";
+import Currencies from "../currencies";
 import LineChart from "../LineChart";
 import InfoBox from "../InfoBox";
 import ToolTip from "../ToolTip";
@@ -197,14 +197,14 @@ const PriceDisplay: React.FC<PriceDisplayProps> = ({
         animate={{ y: [50, 0], opacity: [0, 1] }}
         transition={{ duration: 0.5 }}
       >
-        What's Bitcoin's Price?
+        {"What's Bitcoin's Price?"}
       </motion.h1>
       <h2 className="text-2xl font-semibold text-center text-teal-300">
-        The one million dollar question
+        {"The one million dollar question"}
       </h2>
       <div className="picker-container text-center my-4">
         <span className="block text-lg mb-2">
-          Currency: {currencyDisplayed}
+          {"Currency: " + currencyDisplayed}
         </span>
         <Select
           className="currency-picker"
@@ -282,7 +282,7 @@ const PriceDisplay: React.FC<PriceDisplayProps> = ({
           </div>
         </div>
       </div>
-      <div className={`hidden`}>
+      <div className={"hidden"}>
         <div className="mt-8">
           <h2 className="text-2xl font-semibold text-center text-teal-300 mb-4">
             Find Houses You Can Afford with Bitcoin

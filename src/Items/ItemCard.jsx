@@ -1,8 +1,6 @@
 import React from 'react';
 import './App.css'
 
-
-
 function ItemCard(props) {
     return (
         <div className = "article-card" >

@@ -4,7 +4,7 @@ import "./index.css";
 import App from ".";
 import reportWebVitals from "./reportWebVitals";
 
-ReactDOM.render(
+ReactDOM.createPortal(
   <React.StrictMode>
     <App />
   </React.StrictMode>,
