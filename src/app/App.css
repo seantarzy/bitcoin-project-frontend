@@ -1,0 +1,243 @@
+.App {
+  text-align: center;
+  justify-items: center;
+  justify-content: center;
+}
+
+*{
+  justify-items: center;
+}
+
+.App-logo {
+  height: 40vmin;
+  pointer-events: none;
+}
+
+.home{
+  background-size: cover;
+  justify-items: center;
+  color: white;
+
+}
+
+.house-container{
+  overflow-x: scroll;
+  overflow-y: hidden;
+}
+
+.house-card{
+  padding: 5%;
+    box-shadow: #242c3c;
+  /* display: inline-block; */
+}
+#button-converter{
+  position: absolute;
+  top: -130px;
+  left: 400px;
+  color: blue;
+  /* justify-self: center; */
+  margin-top: 5%;
+  height: 60px;
+  width: 15%;
+  font-size: 20px;
+}
+
+
+
+.App-header {
+  background-color: #282c34;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  justify-items: center;
+  font-size: calc(10px + 2vmin);
+  color: white;
+}
+
+.App-link {
+  color: #61dafb;
+}
+
+.currency-picker{
+  margin-top: 5%;
+  left: 380px;
+  position: absolute;
+  font-size: large;
+  padding: 10;
+  width: 200px;
+  color: black;
+}
+
+.picker-container{
+  text-align: center;
+  margin: auto;
+  /* position: absolute;
+  left: 470px;
+  top: 150px; */
+}
+.bitcoin-info{
+  position: relative;
+  /* top: 240px;
+  left: 400px; */
+  align-items: center;
+}
+.coin{
+  /* position: absolute;
+  top: 170px;
+  left: 370px; */
+}
+.article-card{
+  box-shadow: #242c3c;
+  background-color: rgb(57, 60, 63);
+  text-decoration: none;
+  margin: 5px;
+  padding: 5%;
+}
+.article-card :hover{
+  background-color:  rgb(24, 72, 119);
+}
+.article-card a{
+  text-decoration: none;
+  color: white;
+}
+
+.article-img{
+  height: 40%;
+  width: 40%;
+  max-width: 100%;
+  
+}
+.article-title{
+  size: 20px;
+  position: relative;
+}
+.article-container{
+  margin: auto;
+  width: 150%;
+  display: grid;
+ 
+  justify-items: center;
+   padding-top: 20px;
+   grid-template-columns: repeat(auto-fill, 350px);
+    grid-auto-rows: auto;
+}
+.coin-img{
+  width: 150px;
+      height: 150px;
+      font-size: 0.5px;
+      animation: coin-rotate 3s infinite linear;
+      /* background: linear-gradient(to right, red 50%, black 50%); */
+      border-radius: 100px;
+}
+
+.item-card{
+  /* height: 40px;
+  width: 40px; */
+}
+/* @keyframes spin {
+  from {transform: rotateY(0deg)}
+  to {transform: rotateY(360deg) }
+} */
+
+@keyframes coin-rotate  {  
+                        0%  {
+                            transform: rotateY(0deg); 
+                            transform-origin: 50% 5% 0;
+                            }  
+                        100% {
+                             transform: rotateY(360deg); 
+                             transform-origin: 50% 5% 0;
+                             }  
+                        }
+
+
+@keyframes stock-price-fade-in{
+
+  from {opacity: 0;}
+  to {opacity: 1 }
+
+}
+@media screen and (max-width: 960px){
+
+  .home{
+    zoom: 0.46;
+  }
+  .article-container{
+
+    display: table-cell
+        /* display: flex; */
+        /* flex-wrap: wrap; */
+        /* justify-content: space-between; */
+ 
+        /* flex: 0 1 calc(25% - 1em); */
+    /* background-color: blue; */
+  };
+
+  /* .article-card{
+  box-shadow: #242c3c;
+  background-color: rgb(57, 60, 63);
+  text-decoration: none;
+  margin: 5px;
+  padding: 5%;
+}
+.article-card :hover{
+  background-color:  rgb(24, 72, 119);
+}
+.article-card a{
+  text-decoration: none;
+  color: white;
+}
+
+.article-img{
+  height: 40%;
+  width: 40%;
+  max-width: 100%;
+  
+}
+.article-title{
+  size: 20px;
+  position: relative; */
+/* } */
+
+}
+.item-title{
+  font-size: small;
+}
+.item-img{
+  height: 140px;
+  width: 140px;
+}
+
+.stock-price{
+  font-size: 100px;
+  animation: stock-price-fade-in 1s linear 0s 1;
+  color: green;
+  
+}
+
+.row {
+  display: flex;
+  justify-content: center;
+}
+
+h1 {
+  padding: 0;
+  margin: 0;
+  font-weight: 700;
+  color: #757575;
+}
+
+#coindesk {
+  font-weight: 300;
+}
+
+#coindesk a {
+  text-decoration: none;
+  color: inherit;
+}
+
+.popup {
+  min-height: 50px;
+}
