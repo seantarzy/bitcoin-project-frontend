@@ -45,6 +45,7 @@ const PriceDisplay: React.FC<PriceDisplayProps> = ({
   const [priceNow, setPriceNow] = useState<number | null>(
     parseFloat(initialPrice)
   );
+  const [priceUpdatedAt, setPriceUpdatedAt] = useState<string | null>(null);
   const [fullListOfHouses, setFullListOfHouses] = useState([]);
   const [houses, setHouses] = useState([]);
   const [hoverLoc, setHoverLoc] = useState<number | null>(null);
@@ -90,7 +91,9 @@ const PriceDisplay: React.FC<PriceDisplayProps> = ({
           setCurrencySymbol(
             Currencies.find((c) => c.value === currency)?.symbol || ""
           );
+
           setPriceNow(parseFloat(price));
+          setPriceUpdatedAt(moment().format());
         }
       })
       .catch((err) => {
@@ -209,9 +212,9 @@ const PriceDisplay: React.FC<PriceDisplayProps> = ({
           </h1>
         </div>
         <div className="row mb-4">
-          {!fetchingData && priceNow ? (
+          {!fetchingData && priceNow && priceUpdatedAt ? (
             <InfoBox
-              updatedAt={moment().format()}
+              updatedAt={priceUpdatedAt}
               currentPrice={priceNow}
               data={sortedData}
               currencyCode={currencyChosen}
