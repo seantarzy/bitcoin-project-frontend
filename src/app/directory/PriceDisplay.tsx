@@ -87,6 +87,9 @@ const PriceDisplay: React.FC<PriceDisplayProps> = ({
         }
         const price = resp.data.rates[currency];
         if (price) {
+          setCurrencySymbol(
+            Currencies.find((c) => c.value === currency)?.symbol || ""
+          );
           setPriceNow(parseFloat(price));
         }
       })
@@ -190,9 +193,8 @@ const PriceDisplay: React.FC<PriceDisplayProps> = ({
 
       <div className="flex flex-col gap-4 items-center text-center">
         <p className="text-3xl text-teal-400">
-          {currencySymbol}
+          {currencySymbol + " "}
           {priceNow ? formatPrice(priceNow) : "Loading..."}
-          {" " + currencyChosen}
         </p>
         {priceNow && (
           <p className="text-xl">
