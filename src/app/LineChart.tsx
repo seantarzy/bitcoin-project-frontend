@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import "./LineChart.css";
 import { DataPoint, SvgPoint } from "./types";
+import { formatPrice } from "@/services/helperFunctions";
 
 interface LineChartProps {
   data: DataPoint[];
@@ -12,7 +13,8 @@ interface LineChartProps {
   yLabelSize?: number;
   onChartHover?: (
     hoverLoc: number | null,
-    activePoint: SvgPoint | null
+    activePoint: SvgPoint | null,
+    hemisphere: "left" | "right" | ""
   ) => void;
 }
 
@@ -23,7 +25,7 @@ const LineChart: React.FC<LineChartProps> = ({
   svgHeight = 300,
   svgWidth = 900,
   xLabelSize = 20,
-  yLabelSize = 80,
+  yLabelSize = 120,
   onChartHover = () => {}
 }) => {
   const [hoverLoc, setHoverLoc] = useState<number | null>(null);
@@ -40,6 +42,13 @@ const LineChart: React.FC<LineChartProps> = ({
     return {
       min: data.reduce((min, p) => (p.y < min ? p.y : min), data[0].y),
       max: data.reduce((max, p) => (p.y > max ? p.y : max), data[0].y)
+    };
+  };
+
+  const getConvertedY = () => {
+    return {
+      min: data.reduce((min, p) => (p.cy < min ? p.cy : min), data[0].cy),
+      max: data.reduce((max, p) => (p.cy > max ? p.cy : max), data[0].cy)
     };
   };
 
@@ -117,10 +126,7 @@ const LineChart: React.FC<LineChartProps> = ({
           transform={`translate(${yLabelSize / 2}, 20)`}
           textAnchor="middle"
         >
-          {getY().max.toLocaleString("us-EN", {
-            style: "currency",
-            currency: "USD"
-          })}
+          {formatPrice(getConvertedY().max || 0)}
         </text>
         <text
           transform={`translate(${yLabelSize / 2}, ${
@@ -128,10 +134,7 @@ const LineChart: React.FC<LineChartProps> = ({
           })`}
           textAnchor="middle"
         >
-          {getY().min.toLocaleString("us-EN", {
-            style: "currency",
-            currency: "USD"
-          })}
+          {formatPrice(getConvertedY().min || 0)}
         </text>
         {/* X AXIS LABELS */}
         <text
@@ -172,19 +175,20 @@ const LineChart: React.FC<LineChartProps> = ({
       }
     }
 
-    if (relativeLoc - yLabelSize < 0) {
+    if (relativeLoc - yLabelSize < 0 || window.innerWidth < 768) {
       stopHover();
     } else {
       setHoverLoc(relativeLoc);
       setActivePoint(closestPoint);
-      onChartHover(relativeLoc, closestPoint);
+      const hemisphere = relativeLoc > svgWidth / 2 ? "right" : "left";
+      onChartHover(relativeLoc, closestPoint, hemisphere);
     }
   };
 
   const stopHover = () => {
     setHoverLoc(null);
     setActivePoint(null);
-    onChartHover(null, null);
+    onChartHover(null, null, "");
   };
 
   const makeActivePoint = () => {

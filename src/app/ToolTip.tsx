@@ -6,8 +6,10 @@ const WIDTH = 100;
 
 export function ToolTip({
   hoverLoc,
-  activePoint
+  activePoint,
+  hemisphere
 }: {
+  hemisphere: "left" | "right" | "";
   hoverLoc: number;
   activePoint: ActivePoint;
 }) {
@@ -25,8 +27,15 @@ export function ToolTip({
     width: "auto"
   };
   placementStyles.width = WIDTH + "px";
-  placementStyles.left = hoverLoc + svgLocation.left - WIDTH / 2;
+  placementStyles.left =
+    hemisphere === "left"
+      ? hoverLoc + WIDTH
+      : hemisphere === "right"
+      ? hoverLoc - WIDTH * 2
+      : 0;
 
+  // TODO, make sure the tooltip doesn't go off the screen
+  // if it's to the left
   return (
     <div className="hover" style={placementStyles}>
       <div className="date">{activePoint.d}</div>

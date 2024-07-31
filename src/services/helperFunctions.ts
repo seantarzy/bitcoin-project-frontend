@@ -37,3 +37,8 @@ export const addCommas = (numberString: string): string => {
 
   return numberString;
 };
+
+export const formatPrice = (price: number): string => {
+  const roundedPrice = price.toFixed(2);
+  return addCommas(roundedPrice);
+};

@@ -6,6 +6,7 @@ export type ActivePoint = {
 export interface DataPoint extends ActivePoint {
   x: number;
   y: number;
+  cy: number; // converted y value (for display)
 }
 
 export interface SvgPoint extends ActivePoint {
