@@ -50,7 +50,7 @@ const Home = async () => {
         />
         <meta
           property="og:image"
-          content="https://whatsbitcoinsprice.com/public/assets/bitcoin-coin.png.png"
+          content="https://whatsbitcoinsprice.com/public/favicon.ico"
         />
 
         {/* Twitter */}

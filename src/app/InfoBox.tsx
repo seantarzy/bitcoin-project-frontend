@@ -1,48 +1,29 @@
 import React, { useState, useEffect } from "react";
 import moment from "moment";
 import "./InfoBox.css";
+import { CoinBaseResponse, getBitCoinPrice } from "@/services/utils";
+import { formatPrice } from "@/services/helperFunctions";
 
 interface InfoBoxProps {
-  data: { y: number }[];
+  currentPrice: number;
+  currencyCode: string;
+  updatedAt: string;
+  data: { y: number; cy: number }[];
 }
 
-const InfoBox: React.FC<InfoBoxProps> = ({ data }) => {
-  const [currentPrice, setCurrentPrice] = useState<number | null>(null);
-  const [monthChangeD, setMonthChangeD] = useState<string | null>(null);
-  const [monthChangeP, setMonthChangeP] = useState<string | null>(null);
-  const [updatedAt, setUpdatedAt] = useState<string | null>(null);
+const InfoBox: React.FC<InfoBoxProps> = ({
+  currentPrice,
+  data,
+  currencyCode,
+  updatedAt
+}) => {
+  const change = currentPrice - data[0].cy;
+  const changeP = ((currentPrice - data[0].cy) / data[0].cy) * 100;
 
-  const getData = () => {
-    const url = "https://api.coindesk.com/v1/bpi/currentprice.json";
+  const prefixedOperand = change > 0 ? "+" : "";
+  const monthChangeD = prefixedOperand + formatPrice(change);
 
-    fetch(url)
-      .then((response) => response.json())
-      .then((bitcoinData) => {
-        const price = bitcoinData.bpi.USD.rate_float;
-        const change = price - data[0].y;
-        const changeP = ((price - data[0].y) / data[0].y) * 100;
-
-        setCurrentPrice(price);
-        setMonthChangeD(
-          change.toLocaleString("us-EN", {
-            style: "currency",
-            currency: "USD"
-          })
-        );
-        setMonthChangeP(changeP.toFixed(2) + "%");
-        setUpdatedAt(bitcoinData.time.updated);
-      })
-      .catch((error) => {
-        console.log(error);
-      });
-  };
-
-  useEffect(() => {
-    getData();
-    const refresh = setInterval(getData, 90000);
-
-    return () => clearInterval(refresh);
-  }, []);
+  const monthChangeP = changeP.toFixed(2) + "%";
 
   return (
     <div className="flex flex-col md:flex-row justify-center items-center align-middle text-center">

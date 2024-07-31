@@ -12,64 +12,11 @@ import LineChart from "../LineChart";
 import InfoBox from "../InfoBox";
 import ToolTip from "../ToolTip";
 import House from "../House";
-import { addCommas } from "../../services/helperFunctions";
+import { addCommas, formatPrice } from "../../services/helperFunctions";
 import * as getHouses from "../../pages/api/houses";
 import { motion } from "framer-motion";
 import { ActivePoint } from "../types";
-
-const usStates = [
-  { value: "AL", label: "Alabama" },
-  { value: "AK", label: "Alaska" },
-  { value: "AZ", label: "Arizona" },
-  { value: "AR", label: "Arkansas" },
-  { value: "CA", label: "California" },
-  { value: "CO", label: "Colorado" },
-  { value: "CT", label: "Connecticut" },
-  { value: "DE", label: "Delaware" },
-  { value: "FL", label: "Florida" },
-  { value: "GA", label: "Georgia" },
-  { value: "HI", label: "Hawaii" },
-  { value: "ID", label: "Idaho" },
-  { value: "IL", label: "Illinois" },
-  { value: "IN", label: "Indiana" },
-  { value: "IA", label: "Iowa" },
-  { value: "KS", label: "Kansas" },
-  { value: "KY", label: "Kentucky" },
-  { value: "LA", label: "Louisiana" },
-  { value: "ME", label: "Maine" },
-  { value: "MD", label: "Maryland" },
-  { value: "MA", label: "Massachusetts" },
-  { value: "MI", label: "Michigan" },
-  { value: "MN", label: "Minnesota" },
-  { value: "MS", label: "Mississippi" },
-  { value: "MO", label: "Missouri" },
-  { value: "MT", label: "Montana" },
-  { value: "NE", label: "Nebraska" },
-  { value: "NV", label: "Nevada" },
-  { value: "NH", label: "New Hampshire" },
-  { value: "NJ", label: "New Jersey" },
-  { value: "NM", label: "New Mexico" },
-  { value: "NY", label: "New York" },
-  { value: "NC", label: "North Carolina" },
-  { value: "ND", label: "North Dakota" },
-  { value: "OH", label: "Ohio" },
-  { value: "OK", label: "Oklahoma" },
-  { value: "OR", label: "Oregon" },
-  { value: "PA", label: "Pennsylvania" },
-  { value: "RI", label: "Rhode Island" },
-  { value: "SC", label: "South Carolina" },
-  { value: "SD", label: "South Dakota" },
-  { value: "TN", label: "Tennessee" },
-  { value: "TX", label: "Texas" },
-  { value: "UT", label: "Utah" },
-  { value: "VT", label: "Vermont" },
-  { value: "VA", label: "Virginia" },
-  { value: "WA", label: "Washington" },
-  { value: "WV", label: "West Virginia" },
-  { value: "WI", label: "Wisconsin" },
-  { value: "WY", label: "Wyoming" }
-];
-
+import { usStates } from "../data/houses";
 interface PriceDisplayProps {
   initialPrice: string;
   initialBitcoinInUSD: number;
@@ -95,7 +42,9 @@ const PriceDisplay: React.FC<PriceDisplayProps> = ({
   const [amazonProducts, setAmazonProducts] = useState([]);
   const [sortedData, setSortedData] = useState(initialSortedData);
   const [fetchingData, setFetchingData] = useState(false);
-  const [priceNow, setPriceNow] = useState<string | null>(initialPrice);
+  const [priceNow, setPriceNow] = useState<number | null>(
+    parseFloat(initialPrice)
+  );
   const [fullListOfHouses, setFullListOfHouses] = useState([]);
   const [houses, setHouses] = useState([]);
   const [hoverLoc, setHoverLoc] = useState<number | null>(null);
@@ -103,16 +52,29 @@ const PriceDisplay: React.FC<PriceDisplayProps> = ({
   const [cutoffHouseIndex, setCutoffHouseIndex] = useState(0);
   const [selectedState, setSelectedState] = useState<string | null>(null);
   const [bitcoins, setBitcoins] = useState<number>(0);
-
-  const handleChartHover = (hoverLoc: number, activePoint: ActivePoint) => {
+  const [hemisphere, setHemisphere] = useState<"left" | "right" | "">("");
+  const handleChartHover = (
+    hoverLoc: number,
+    activePoint: ActivePoint,
+    hemisphere: "left" | "right" | ""
+  ) => {
+    if (window.innerWidth <= 768) return;
     setHoverLoc(hoverLoc);
     setActivePoint(activePoint);
+    setHemisphere(hemisphere);
   };
 
   const handleSelect = (e: any) => {
     setCurrencyChosen(e.value);
     getBitCoinPriceByCurrentCurrency(e.value);
   };
+
+  useEffect(() => {
+    setCurrencyChosen("USD");
+    setCurrencyDisplayed("US Dollars");
+    setCurrencySymbol("$");
+    getBitCoinPriceByCurrentCurrency();
+  }, []);
 
   const getBitCoinPriceByCurrentCurrency = (currency: string = "USD") => {
     getBitCoinPrice()
@@ -125,10 +87,7 @@ const PriceDisplay: React.FC<PriceDisplayProps> = ({
         }
         const price = resp.data.rates[currency];
         if (price) {
-          const priceFloat = parseFloat(price);
-          const roundedPrice = priceFloat.toFixed(2);
-          const priceNowString = addCommas(roundedPrice);
-          setPriceNow(priceNowString);
+          setPriceNow(parseFloat(price));
         }
       })
       .catch((err) => {
@@ -148,16 +107,21 @@ const PriceDisplay: React.FC<PriceDisplayProps> = ({
   };
 
   useEffect(() => {
-    getBitCoinPriceByCurrentCurrency();
     let sortedData: any = [];
     getBitcoinStockChartData().then((bitcoinData) => {
       let count = 0;
       for (let date in bitcoinData.bpi) {
+        const convertedPrice =
+          priceNow && bitcoinInUSD
+            ? (Number(priceNow) / Number(bitcoinInUSD)) * bitcoinData.bpi[date]
+            : bitcoinData.bpi[date];
+        const p = currencySymbol + "" + formatPrice(convertedPrice);
         sortedData.push({
           d: moment(date).format("MMM DD"),
-          p: bitcoinData.bpi[date].toLocaleString(),
+          p,
           x: count,
-          y: bitcoinData.bpi[date]
+          y: bitcoinData.bpi[date],
+          cy: convertedPrice
         });
         count++;
       }
@@ -168,14 +132,7 @@ const PriceDisplay: React.FC<PriceDisplayProps> = ({
     if (window.innerWidth <= 760) {
       setMobile(true);
     }
-
-    getBitCoinPrice();
-    // if (articles.length == 0) {
-    //   getArticles().then((articles) => {
-    //     setArticles(articles.articles);
-    //   });
-    // }
-  }, []);
+  }, [bitcoinInUSD, priceNow, currencySymbol]);
 
   const showMoreHouses = () => {
     setCutoffHouseIndex(cutoffHouseIndex + 10);
@@ -211,6 +168,7 @@ const PriceDisplay: React.FC<PriceDisplayProps> = ({
           options={Currencies}
           onChange={handleSelect}
           placeholder="Select Currency"
+          value={Currencies.find((c) => c.value === currencyChosen)}
           styles={{
             control: (base) => ({
               ...base,
@@ -233,12 +191,14 @@ const PriceDisplay: React.FC<PriceDisplayProps> = ({
       <div className="flex flex-col gap-4 items-center text-center">
         <p className="text-3xl text-teal-400">
           {currencySymbol}
-          {priceNow ? priceNow : "Loading..."}
+          {priceNow ? formatPrice(priceNow) : "Loading..."}
           {" " + currencyChosen}
         </p>
-        <p className="text-xl">
-          One bitcoin is worth {priceNow} {currencyChosen}s
-        </p>
+        {priceNow && (
+          <p className="text-xl">
+            One bitcoin is worth {formatPrice(priceNow)} {currencyChosen}s
+          </p>
+        )}
       </div>
       <div className="container mt-8">
         <div className="row mb-4">
@@ -247,22 +207,37 @@ const PriceDisplay: React.FC<PriceDisplayProps> = ({
           </h1>
         </div>
         <div className="row mb-4">
-          {!fetchingData ? <InfoBox data={sortedData} /> : null}
+          {!fetchingData && priceNow ? (
+            <InfoBox
+              updatedAt={moment().format()}
+              currentPrice={priceNow}
+              data={sortedData}
+              currencyCode={currencyChosen}
+              key={currencyChosen}
+            />
+          ) : null}
         </div>
         <div className="row mb-4">
           <div className="popup">
-            {hoverLoc && activePoint ? (
-              <ToolTip hoverLoc={hoverLoc} activePoint={activePoint} />
+            {hoverLoc && activePoint && (window?.innerWidth || 0) > 768 ? (
+              <ToolTip
+                hoverLoc={hoverLoc}
+                activePoint={activePoint}
+                hemisphere={hemisphere}
+              />
             ) : null}
           </div>
         </div>
         <div className="row mb-4">
           <div className="chart w-full">
-            {!fetchingData ? (
+            {!fetchingData && priceNow && bitcoinInUSD ? (
               <LineChart
                 data={sortedData}
-                onChartHover={(a, b) => {
-                  !!a && !!b && handleChartHover(a, b);
+                onChartHover={(a, b, h) => {
+                  !!a &&
+                    !!b &&
+                    window.innerWidth > 768 &&
+                    handleChartHover(a, b, h);
                 }}
               />
             ) : null}
