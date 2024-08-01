@@ -72,7 +72,6 @@ const PriceDisplay: React.FC<PriceDisplayProps> = ({
 
   useEffect(() => {
     setCurrencyChosen("USD");
-    setCurrencyDisplayed("US Dollars");
     setCurrencySymbol("$");
     getBitCoinPriceByCurrentCurrency();
   }, []);
@@ -166,9 +165,7 @@ const PriceDisplay: React.FC<PriceDisplayProps> = ({
         {"The one million dollar question"}
       </h2>
       <div className="picker-container text-center my-4">
-        <span className="block text-lg mb-2">
-          {"Currency: " + currencyDisplayed}
-        </span>
+        <span className="block text-lg mb-2">{"Select Currency: "}</span>
         <Select
           className="currency-picker"
           options={Currencies}
