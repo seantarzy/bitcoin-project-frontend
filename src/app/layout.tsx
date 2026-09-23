@@ -6,7 +6,14 @@ const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
   title: "What's Bitcoin's Price?",
-  description: "A one stop shop for all things Bitcoin. What's the price now? What's the price in the past? What's the price in the future? What's the price in the past? What're the trends?"
+  description: "Check Bitcoin prices in your currency and explore the last 30 days of daily closing prices, with clear historical comparisons.",
+  openGraph: {
+    title: "What's Bitcoin's Price?",
+    description: "Bitcoin prices and 30-day historical comparisons.",
+    url: "https://whatsbitcoinsprice.com/",
+    type: "website"
+  }
+
 };
 
 export default function RootLayout({

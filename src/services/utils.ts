@@ -1,23 +1,38 @@
-export const getBitCoinPrice = () =>
-  fetch(`https://api.coinbase.com/v2/exchange-rates?currency=BTC`, {
-    method: "GET",
-    headers: {
-      "Content-Type": "application/json"
-    }
-  }).then((response) => response.json());
+import { historyWindow, normalizeCandles, normalizeRates, type MarketData, type PriceSnapshot } from "./marketData";
 
-export const getBitcoinStockChartData = () =>
-  fetch("https://api.coindesk.com/v1/bpi/historical/close.json").then(
-    (response) => {
-      return response.json();
-    }
-  );
+async function request(url: string, revalidate: number) {
+  const response = await fetch(url, {
+    next: { revalidate },
+    signal: AbortSignal.timeout(10000),
+    headers: { Accept: "application/json" }
+  });
+  if (!response.ok) throw new Error(`Market data request failed (${response.status})`);
+  return response;
+}
 
-export type CoinBaseResponse = {
-  data: {
-    currency: string;
-    rates: {
-      [key: string]: string;
-    };
+export async function getBitCoinPrice(): Promise<PriceSnapshot> {
+  const response = await request("https://api.coinbase.com/v2/exchange-rates?currency=BTC", 60);
+  const rates = normalizeRates(await response.json());
+  const responseDate = response.headers.get("date");
+  return { rates, fetchedAt: responseDate && Number.isFinite(Date.parse(responseDate)) ? new Date(responseDate).toISOString() : new Date().toISOString() };
+}
+
+export async function getBitcoinStockChartData() {
+  const now = new Date();
+  const { start, end } = historyWindow(now);
+  const params = new URLSearchParams({
+    granularity: "86400", start: new Date(start).toISOString(), end: new Date(end).toISOString()
+  });
+  const response = await request(`https://api.exchange.coinbase.com/products/BTC-USD/candles?${params}`, 3600);
+  return normalizeCandles(await response.json(), now);
+}
+
+export async function getMarketData(): Promise<MarketData> {
+  const [quote, history] = await Promise.allSettled([getBitCoinPrice(), getBitcoinStockChartData()]);
+  return {
+    quote: quote.status === "fulfilled" ? quote.value : null,
+    history: history.status === "fulfilled" ? history.value : [],
+    quoteError: quote.status === "rejected",
+    historyError: history.status === "rejected"
   };
-};
+}

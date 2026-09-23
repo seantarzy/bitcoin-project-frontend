@@ -1,36 +1,44 @@
-This is a [Next.js](https://nextjs.org/) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
+# What's Bitcoin's Price?
 
-## Getting Started
+Next.js dashboard for Bitcoin exchange rates and the last 30 completed UTC daily closes.
 
-First, run the development server:
+## Development
 
-```bash
+```sh
+npm ci
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open http://localhost:3000. Production validation:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```sh
+npm test
+npm run build
+npm start
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/basic-features/font-optimization) to automatically optimize and load Inter, a custom Google Font.
+`npm test` compiles the market-data functions into ignored `.test-build/` output and runs Node's regression tests. No live API calls are made by the tests.
 
-## Learn More
+## Market data
 
-To learn more about Next.js, take a look at the following resources:
+- Current exchange rates: Coinbase `/v2/exchange-rates?currency=BTC`.
+- Daily closes: Coinbase Exchange `/products/BTC-USD/candles`, with `granularity=86400` and explicit UTC date bounds. Incomplete current-day candles are excluded, results are validated, deduplicated and sorted, and stale history is rejected.
+- Pages and `/api/market-data` revalidate every 60 seconds. Upstream quotes cache for 60 seconds and historical requests for one hour. The browser refreshes on arrival, every minute while visible, and on request. API credentials are not required for these public endpoints.
+- Quote and history requests fail independently. The page can render when either provider request fails. Refresh failures retain the previous values with a visible warning and suppress the change calculation.
+- Dates label candle **start dates**; amounts are the closing price for that UTC day. The summary compares the latest quote with the first available closing price in the displayed range, with its date explicitly labeled.
+- Non-USD charts estimate historical values using the latest USD conversion ratio. They do not incorporate historical foreign-exchange movements; the page explains this limitation.
+- Keep numeric prices as numbers across server/client boundaries. Formatting is for display only.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Analytics
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js/) - your feedback and contributions are welcome!
+Production builds use `NEXT_PUBLIC_MEASUREMENT_ID`. Development mode does not load Analytics. For a local production preview without recording traffic, build with:
 
-## Deploy on Vercel
+```sh
+NEXT_PUBLIC_MEASUREMENT_ID='' npm run build
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Before deploying, use the existing live site's hosting project and configured measurement ID. The working changes do not alter the live deployment or analytics settings.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/deployment) for more details.
+## Regression coverage
+
+Tests cover numeric prices containing thousands, malformed rates, candle sorting/ranges/freshness, currency conversion, missing baselines, flat chart scales, rate limits and provider outages. Browser verification should include USD/EUR switching, refresh, chart inspection and mobile layout.

@@ -1,347 +1,86 @@
 "use client";
-import React, { Suspense, useEffect, useState } from "react";
-import moment from "moment";
-import {
-  CoinBaseResponse,
-  getBitCoinPrice,
-  getBitcoinStockChartData
-} from "../../services/utils";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Select from "react-select";
 import Currencies from "../currencies";
 import LineChart from "../LineChart";
 import InfoBox from "../InfoBox";
-import ToolTip from "../ToolTip";
-import House from "../House";
-import { addCommas, formatPrice } from "../../services/helperFunctions";
-import * as getHouses from "../../pages/api/houses";
-import { motion } from "framer-motion";
-import { ActivePoint } from "../types";
-import { usStates } from "../data/houses";
-interface PriceDisplayProps {
-  initialPrice: string;
-  initialBitcoinInUSD: number;
-  initialSortedData: any[];
-}
+import { chartData, formatAmount, type MarketData } from "@/services/marketData";
 
-const PriceDisplay: React.FC<PriceDisplayProps> = ({
-  initialPrice,
-  initialBitcoinInUSD,
-  initialSortedData
-}) => {
-  const [itemOfTheDay, setItemOfTheDay] = useState(null);
-  const [priceData, setPriceData] = useState(null);
-  const [currencyChosen, setCurrencyChosen] = useState("USD");
-  const [currencyDisplayed, setCurrencyDisplayed] = useState("US Dollars");
-  const [currencySymbol, setCurrencySymbol] = useState("$");
-  const [flippingCoin, setFlippingCoin] = useState(true);
-  const [articles, setArticles] = useState([]);
-  const [mobile, setMobile] = useState<boolean>(false);
-  const [bitcoinInUSD, setBitcoinInUSD] = useState<number | null>(
-    initialBitcoinInUSD
-  );
-  const [amazonProducts, setAmazonProducts] = useState([]);
-  const [sortedData, setSortedData] = useState(initialSortedData);
-  const [fetchingData, setFetchingData] = useState(false);
-  const [priceNow, setPriceNow] = useState<number | null>(
-    parseFloat(initialPrice)
-  );
-  const [priceUpdatedAt, setPriceUpdatedAt] = useState<string | null>(null);
-  const [fullListOfHouses, setFullListOfHouses] = useState([]);
-  const [houses, setHouses] = useState([]);
-  const [hoverLoc, setHoverLoc] = useState<number | null>(null);
-  const [activePoint, setActivePoint] = useState<ActivePoint | null>(null);
-  const [cutoffHouseIndex, setCutoffHouseIndex] = useState(0);
-  const [selectedState, setSelectedState] = useState<string | null>(null);
-  const [bitcoins, setBitcoins] = useState<number>(0);
-  const [hemisphere, setHemisphere] = useState<"left" | "right" | "">("");
-  const handleChartHover = (
-    hoverLoc: number,
-    activePoint: ActivePoint,
-    hemisphere: "left" | "right" | ""
-  ) => {
-    if (window.innerWidth <= 768) return;
-    setHoverLoc(hoverLoc);
-    setActivePoint(activePoint);
-    setHemisphere(hemisphere);
-  };
-
-  const handleSelect = (e: any) => {
-    setCurrencyChosen(e.value);
-    getBitCoinPriceByCurrentCurrency(e.value);
-  };
-
-  useEffect(() => {
-    setCurrencyChosen("USD");
-    setCurrencySymbol("$");
-    getBitCoinPriceByCurrentCurrency();
+export default function PriceDisplay({ initialData }: { initialData: MarketData }) {
+  const [market, setMarket] = useState(initialData);
+  const [currency, setCurrency] = useState("USD");
+  const [refreshing, setRefreshing] = useState(false);
+  const controller = useRef<AbortController | null>(null);
+  const refresh = useCallback(async () => {
+    if (controller.current) return;
+    const request = new AbortController();
+    controller.current = request;
+    const timeout = setTimeout(() => request.abort(), 15000);
+    setRefreshing(true);
+    try {
+      const response = await fetch("/api/market-data", { signal: request.signal, cache: "no-store" });
+      if (!response.ok) throw new Error("Refresh failed");
+      const next: MarketData = await response.json();
+      setMarket(previous => ({
+        ...next,
+        quote: next.quote ?? previous.quote,
+        history: next.historyError ? previous.history : next.history
+      }));
+    } catch {
+      setMarket(previous => ({ ...previous, quoteError: true, historyError: true }));
+    } finally {
+      clearTimeout(timeout);
+      controller.current = null;
+      setRefreshing(false);
+    }
   }, []);
 
-  const getBitCoinPriceByCurrentCurrency = (currency: string = "USD") => {
-    getBitCoinPrice()
-      .then((resp: CoinBaseResponse) => {
-        let bitcoinInUSD = null;
-        if (resp.data.currency === "BTC") {
-          bitcoinInUSD = resp.data.rates["USD"];
-          const bitcointUSDNum = parseFloat(bitcoinInUSD);
-          setBitcoinInUSD(bitcointUSDNum);
-        }
-        const price = resp.data.rates[currency];
-        if (price) {
-          setCurrencySymbol(
-            Currencies.find((c) => c.value === currency)?.symbol || ""
-          );
-
-          setPriceNow(parseFloat(price));
-          setPriceUpdatedAt(moment().format());
-        }
-      })
-      .catch((err) => {
-        console.error(err);
-      });
-  };
-
-  const fetchHouses = async () => {
-    if (!selectedState || bitcoins <= 0) return;
-
-    const priceInUSD = bitcoinInUSD ? bitcoinInUSD * bitcoins : 0;
-    const response = await fetch(
-      `https://api.bridgedataoutput.com/api/v2/OData/dataset_id/Properties?access_token=YOUR_ACCESS_TOKEN&$filter=ListPrice lt ${priceInUSD} and State eq '${selectedState}'`
-    );
-    const data = await response.json();
-    setHouses(data.value);
-  };
-
   useEffect(() => {
-    let sortedData: any = [];
-    getBitcoinStockChartData().then((bitcoinData) => {
-      let count = 0;
-      for (let date in bitcoinData.bpi) {
-        const convertedPrice =
-          priceNow && bitcoinInUSD
-            ? (Number(priceNow) / Number(bitcoinInUSD)) * bitcoinData.bpi[date]
-            : bitcoinData.bpi[date];
-        const p = currencySymbol + "" + formatPrice(convertedPrice);
-        sortedData.push({
-          d: moment(date).format("MMM DD"),
-          p,
-          x: count,
-          y: bitcoinData.bpi[date],
-          cy: convertedPrice
-        });
-        count++;
-      }
-      setSortedData(sortedData);
-      setFetchingData(false);
-    });
+    // Revalidate on arrival as an ISR page may contain an older snapshot.
+    void refresh();
+    const interval = setInterval(() => { if (!document.hidden) void refresh(); }, 60000);
+    return () => clearInterval(interval);
+  }, [refresh]);
 
-    if (window.innerWidth <= 760) {
-      setMobile(true);
-    }
-  }, [bitcoinInUSD, priceNow, currencySymbol]);
-
-  const showMoreHouses = () => {
-    setCutoffHouseIndex(cutoffHouseIndex + 10);
-  };
-
-  const showLessHouses = () => {
-    setCutoffHouseIndex(cutoffHouseIndex - 10);
-  };
-
+  const price = market.quote?.rates[currency] ?? null;
+  const points = chartData(market.history, market.quote?.rates, currency);
+  const options = Currencies.filter(option => !market.quote || market.quote.rates[option.value]);
   return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      transition={{ duration: 0.5 }}
-      className="flex flex-col gap-4 bg-gradient-to-br from-gray-900 to-gray-800 text-white p-8 rounded-lg shadow-lg backdrop-blur-md"
-    >
-      <motion.h1
-        className="text-4xl font-bold text-center bg-clip-text text-transparent bg-gradient-to-r from-teal-400 to-blue-500"
-        animate={{ y: [50, 0], opacity: [0, 1] }}
-        transition={{ duration: 0.5 }}
-      >
-        {"What's Bitcoin's Price?"}
-      </motion.h1>
-      <h2 className="text-2xl font-semibold text-center text-teal-300">
-        {"The one million dollar question"}
-      </h2>
-      <div className="picker-container text-center my-4">
-        <span className="block text-lg mb-2">{"Select Currency: "}</span>
+    <div className="flex flex-col gap-5 rounded-lg bg-gradient-to-br from-gray-900 to-gray-800 p-4 text-white shadow-lg md:p-8">
+      <h1 className="text-center text-3xl font-bold text-teal-300 md:text-4xl">What&apos;s Bitcoin&apos;s Price?</h1>
+      <p className="text-center text-xl text-teal-200">The one million dollar question</p>
+      <div className="mx-auto w-full max-w-sm">
+        <label htmlFor="currency" className="mb-2 block">Select currency</label>
         <Select
-          className="currency-picker"
-          options={Currencies}
-          onChange={handleSelect}
-          placeholder="Select Currency"
-          value={Currencies.find((c) => c.value === currencyChosen)}
+          inputId="currency" instanceId="currency" options={options}
+          value={Currencies.find(option => option.value === currency)}
+          onChange={option => { if (option) setCurrency(option.value); }}
           styles={{
-            control: (base) => ({
-              ...base,
-              backgroundColor: "transparent",
-              borderColor: "#2d3748",
-              color: "white"
-            }),
-            menu: (base) => ({
-              ...base,
-              backgroundColor: "#2d3748"
-            }),
-            singleValue: (base) => ({
-              ...base,
-              color: "white"
-            })
+            control: base => ({ ...base, backgroundColor: "#1f2937", borderColor: "#64748b" }),
+            menu: base => ({ ...base, backgroundColor: "#1f2937" }),
+            option: (base, state) => ({ ...base, backgroundColor: state.isFocused || state.isSelected ? "#115e59" : "#1f2937" }),
+            input: base => ({ ...base, color: "white" }),
+            singleValue: base => ({ ...base, color: "white" })
           }}
         />
       </div>
-
-      <div className="flex flex-col gap-4 items-center text-center">
-        <p className="text-3xl text-teal-400">
-          {currencySymbol + " "}
-          {priceNow ? formatPrice(priceNow) : "Loading..."}
-        </p>
-        {priceNow && (
-          <p className="text-xl">
-            One bitcoin is worth {formatPrice(priceNow)} {currencyChosen}s
-          </p>
-        )}
+      <div className="text-center" aria-live="polite">
+        <p className="text-3xl text-teal-300">{price === null ? "Price unavailable" : formatAmount(price, currency)}</p>
+        <p className="mt-2">{price === null ? "Please try refreshing." : `One bitcoin in ${currency}`}</p>
+        {market.quote && <p className="mt-2 text-xs text-gray-300">Rates retrieved {new Date(market.quote.fetchedAt).toISOString().replace("T", " ").replace(".000Z", " UTC")}</p>}
+        {market.quoteError && <p role="status" className="mt-2 text-amber-200">{market.quote ? "Price refresh failed. Showing the last retrieved quote." : "Current prices are temporarily unavailable."}</p>}
       </div>
-      <div className="container mt-8">
-        <div className="row mb-4">
-          <h1 className="text-2xl font-semibold text-center text-teal-300">
-            30 Day Bitcoin Price Chart
-          </h1>
-        </div>
-        <div className="row mb-4">
-          {!fetchingData && priceNow && priceUpdatedAt ? (
-            <InfoBox
-              updatedAt={priceUpdatedAt}
-              currentPrice={priceNow}
-              data={sortedData}
-              currencyCode={currencyChosen}
-              key={currencyChosen}
-            />
-          ) : null}
-        </div>
-        <div className="row mb-4">
-          <div className="popup">
-            {hoverLoc && activePoint && (window?.innerWidth || 0) > 768 ? (
-              <ToolTip
-                hoverLoc={hoverLoc}
-                activePoint={activePoint}
-                hemisphere={hemisphere}
-              />
-            ) : null}
-          </div>
-        </div>
-        <div className="row mb-4">
-          <div className="chart w-full">
-            {!fetchingData && priceNow && bitcoinInUSD ? (
-              <LineChart
-                data={sortedData}
-                onChartHover={(a, b, h) => {
-                  !!a &&
-                    !!b &&
-                    window.innerWidth > 768 &&
-                    handleChartHover(a, b, h);
-                }}
-              />
-            ) : null}
-          </div>
-        </div>
-        <div className="row mb-4">
-          <div id="coindesk" className="text-teal-300 text-center">
-            Powered by{" "}
-            <a
-              className="text-teal-300 hover:text-teal-500"
-              href="http://www.coindesk.com/price/"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              CoinDesk
-            </a>
-          </div>
-        </div>
+      <div className="text-center">
+        <button onClick={() => void refresh()} disabled={refreshing} className="rounded border border-teal-400 px-4 py-2 text-teal-200 disabled:opacity-50">{refreshing ? "Refreshing…" : "Refresh data"}</button>
       </div>
-      <div className={"hidden"}>
-        <div className="mt-8">
-          <h2 className="text-2xl font-semibold text-center text-teal-300 mb-4">
-            Find Houses You Can Afford with Bitcoin
-          </h2>
-          <div className="flex flex-col items-center gap-4">
-            <div className="w-full max-w-md">
-              <Select
-                options={usStates}
-                onChange={(e) => setSelectedState(e?.value || null)}
-                placeholder="I want to live in..."
-                className="mb-4"
-              />
-            </div>
-            <div className="w-full max-w-md">
-              <input
-                type="number"
-                placeholder="I have X amount of Bitcoins"
-                value={bitcoins}
-                onChange={(e) => setBitcoins(Number(e.target.value))}
-                className="w-full p-2 rounded bg-gray-800 text-white"
-              />
-            </div>
-            <button
-              onClick={fetchHouses}
-              className="bg-teal-400 hover:bg-teal-500 text-gray-900 px-4 py-2 rounded"
-            >
-              Find Houses
-            </button>
-          </div>
-        </div>
-
-        <div className="house-container mt-8">
-          {houses.slice(0, cutoffHouseIndex).map((house: getHouses.House) => (
-            <House
-              key={house.id}
-              {...house}
-              bitcoinPrice={bitcoinInUSD}
-              city={house.Address.City}
-              state={house.Address.State}
-            />
-          ))}
-          {cutoffHouseIndex > 0 ? (
-            <div className="flex justify-center gap-4 mt-4">
-              <button
-                className="bg-teal-400 hover:bg-teal-500 text-gray-900 px-4 py-2 rounded"
-                onClick={showMoreHouses}
-              >
-                Show More Houses
-              </button>
-              <button
-                className="bg-teal-400 hover:bg-teal-500 text-gray-900 px-4 py-2 rounded"
-                onClick={showLessHouses}
-              >
-                Show Less Houses
-              </button>
-            </div>
-          ) : cutoffHouseIndex === 0 ? (
-            <button
-              className="bg-teal-400 hover:bg-teal-500 text-gray-900 px-4 py-2 rounded mx-auto block"
-              onClick={showMoreHouses}
-            >
-              Show Houses
-            </button>
-          ) : cutoffHouseIndex === houses.length ? (
-            <button
-              className="bg-teal-400 hover:bg-teal-500 text-gray-900 px-4 py-2 rounded mx-auto block"
-              onClick={showLessHouses}
-            >
-              Show Less Houses
-            </button>
-          ) : cutoffHouseIndex === 10 ? (
-            <button
-              className="bg-teal-400 hover:bg-teal-500 text-gray-900 px-4 py-2 rounded mx-auto block"
-              onClick={showLessHouses}
-            >
-              Hide Houses
-            </button>
-          ) : null}
-        </div>
-      </div>
-    </motion.div>
+      <h2 className="mt-4 text-center text-2xl font-semibold text-teal-300">30 Day Bitcoin Price Chart</h2>
+      <InfoBox currentPrice={market.quoteError || market.historyError ? null : price} baseline={points[0]?.cy} currencyCode={currency} since={market.history[0]?.date} />
+      {market.historyError && <p role="status" className="text-center text-amber-200">{points.length ? "History refresh failed. Showing the last retrieved chart." : "Historical prices are temporarily unavailable. Try refreshing."}</p>}
+      {points.length ? <LineChart key={currency} data={points} /> : !market.historyError && <p className="text-center">Chart unavailable for this currency.</p>}
+      <p className="text-center text-xs text-gray-300">
+        Completed daily closes in UTC. {currency !== "USD" && "Converted from USD using the latest retrieved exchange rate; historical FX changes are not included."}
+      </p>
+      <p className="text-center text-teal-300">Price and historical data from <a className="underline" href="https://www.coinbase.com/price/bitcoin" target="_blank" rel="noopener noreferrer">Coinbase</a>.</p>
+    </div>
   );
-};
-
-export default PriceDisplay;
+}

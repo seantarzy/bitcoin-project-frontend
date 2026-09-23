@@ -1,239 +1,54 @@
-import React, { useState } from "react";
+import { useState } from "react";
+import type { DataPoint } from "./types";
+import { chartScale } from "@/services/marketData";
 import "./LineChart.css";
-import { DataPoint, SvgPoint } from "./types";
-import { formatPrice } from "@/services/helperFunctions";
 
-interface LineChartProps {
-  data: DataPoint[];
-  color?: string;
-  pointRadius?: number;
-  svgHeight?: number;
-  svgWidth?: number;
-  xLabelSize?: number;
-  yLabelSize?: number;
-  onChartHover?: (
-    hoverLoc: number | null,
-    activePoint: SvgPoint | null,
-    hemisphere: "left" | "right" | ""
-  ) => void;
-}
-
-const LineChart: React.FC<LineChartProps> = ({
-  data,
-  color = "#2196F3",
-  pointRadius = 5,
-  svgHeight = 300,
-  svgWidth = 900,
-  xLabelSize = 20,
-  yLabelSize = 120,
-  onChartHover = () => {}
-}) => {
-  const [hoverLoc, setHoverLoc] = useState<number | null>(null);
-  const [activePoint, setActivePoint] = useState<SvgPoint | null>(null);
-
-  const getX = () => {
-    return {
-      min: data[0].x,
-      max: data[data.length - 1].x
-    };
+export default function LineChart({ data }: { data: DataPoint[] }) {
+  const [selected, setSelected] = useState<number | null>(null);
+  const points = data.filter(point => Number.isFinite(point.x) && Number.isFinite(point.y));
+  if (points.length < 2) return <p className="text-center">Not enough history to draw a chart.</p>;
+  const width = 900, height = 300, left = 120, top = 20, bottom = 265;
+  const scale = chartScale(points);
+  const x = (value: number) => left + scale.x(value) * (width - left - 10);
+  const y = (value: number) => bottom - scale.y(value) * (bottom - top);
+  const line = points.map((point, i) => `${i ? "L" : "M"} ${x(point.x)} ${y(point.y)}`).join(" ");
+  const first = points[0], last = points[points.length - 1];
+  const active = selected === null ? null : points[selected];
+  const label = (value: number) => new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 }).format(value);
+  const choosePoint = (event: React.PointerEvent<SVGSVGElement>) => {
+    const bounds = event.currentTarget.getBoundingClientRect();
+    const cursor = (event.clientX - bounds.left) / bounds.width * width;
+    let nearest = 0;
+    points.forEach((point, i) => { if (Math.abs(x(point.x) - cursor) < Math.abs(x(points[nearest].x) - cursor)) nearest = i; });
+    setSelected(nearest);
   };
-
-  const getY = () => {
-    return {
-      min: data.reduce((min, p) => (p.y < min ? p.y : min), data[0].y),
-      max: data.reduce((max, p) => (p.y > max ? p.y : max), data[0].y)
-    };
-  };
-
-  const getConvertedY = () => {
-    return {
-      min: data.reduce((min, p) => (p.cy < min ? p.cy : min), data[0].cy),
-      max: data.reduce((max, p) => (p.cy > max ? p.cy : max), data[0].cy)
-    };
-  };
-
-  const getSvgX = (x: number) => {
-    return yLabelSize + (x / getX().max) * (svgWidth - yLabelSize);
-  };
-
-  const getSvgY = (y: number) => {
-    const gY = getY();
-    return (
-      ((svgHeight - xLabelSize) * gY.max - (svgHeight - xLabelSize) * y) /
-      (gY.max - gY.min)
-    );
-  };
-
-  const makePath = () => {
-    let pathD = `M ${getSvgX(data[0].x)} ${getSvgY(data[0].y)} `;
-
-    pathD += data
-      .map((point) => `L ${getSvgX(point.x)} ${getSvgY(point.y)} `)
-      .join("");
-
-    return (
-      <path className="linechart_path" d={pathD} style={{ stroke: color }} />
-    );
-  };
-
-  const makeArea = () => {
-    let pathD = `M ${getSvgX(data[0].x)} ${getSvgY(data[0].y)} `;
-
-    pathD += data
-      .map((point) => `L ${getSvgX(point.x)} ${getSvgY(point.y)} `)
-      .join("");
-
-    const x = getX();
-    const y = getY();
-    pathD += `L ${getSvgX(x.max)} ${getSvgY(y.min)} L ${getSvgX(
-      x.min
-    )} ${getSvgY(y.min)} `;
-
-    return <path className="linechart_area" d={pathD} />;
-  };
-
-  const makeAxis = () => {
-    const x = getX();
-    const y = getY();
-
-    return (
-      <g className="linechart_axis">
-        <line
-          x1={getSvgX(x.min) - yLabelSize}
-          y1={getSvgY(y.min)}
-          x2={getSvgX(x.max)}
-          y2={getSvgY(y.min)}
-          strokeDasharray="5"
-        />
-        <line
-          x1={getSvgX(x.min) - yLabelSize}
-          y1={getSvgY(y.max)}
-          x2={getSvgX(x.max)}
-          y2={getSvgY(y.max)}
-          strokeDasharray="5"
-        />
-      </g>
-    );
-  };
-
-  const makeLabels = () => {
-    const padding = 5;
-
-    return (
-      <g className="linechart_label">
-        {/* Y AXIS LABELS */}
-        <text
-          transform={`translate(${yLabelSize / 2}, 20)`}
-          textAnchor="middle"
-        >
-          {formatPrice(getConvertedY().max || 0)}
-        </text>
-        <text
-          transform={`translate(${yLabelSize / 2}, ${
-            svgHeight - xLabelSize - padding
-          })`}
-          textAnchor="middle"
-        >
-          {formatPrice(getConvertedY().min || 0)}
-        </text>
-        {/* X AXIS LABELS */}
-        <text
-          transform={`translate(${yLabelSize}, ${svgHeight})`}
-          textAnchor="start"
-        >
-          {data[0].d}
-        </text>
-        <text
-          transform={`translate(${svgWidth}, ${svgHeight})`}
-          textAnchor="end"
-        >
-          {data[data.length - 1].d}
-        </text>
-      </g>
-    );
-  };
-
-  const getCoords = (e: React.MouseEvent<SVGSVGElement, MouseEvent>) => {
-    const svgLocation = document
-      .getElementsByClassName("linechart")[0]
-      .getBoundingClientRect();
-    const adjustment = (svgLocation.width - svgWidth) / 2; // takes padding into consideration
-    const relativeLoc = e.clientX - svgLocation.left - adjustment;
-
-    const svgData: SvgPoint[] = data.map((point: DataPoint) => ({
-      svgX: getSvgX(point.x),
-      svgY: getSvgY(point.y),
-      d: point.d,
-      p: point.p
-    }));
-
-    let closestPoint = {} as SvgPoint;
-    for (let i = 0, c = 500; i < svgData.length; i++) {
-      if (Math.abs(svgData[i].svgX - relativeLoc) <= c) {
-        c = Math.abs(svgData[i].svgX - relativeLoc);
-        closestPoint = svgData[i];
-      }
-    }
-
-    if (relativeLoc - yLabelSize < 0 || window.innerWidth < 768) {
-      stopHover();
-    } else {
-      setHoverLoc(relativeLoc);
-      setActivePoint(closestPoint);
-      const hemisphere = relativeLoc > svgWidth / 2 ? "right" : "left";
-      onChartHover(relativeLoc, closestPoint, hemisphere);
-    }
-  };
-
-  const stopHover = () => {
-    setHoverLoc(null);
-    setActivePoint(null);
-    onChartHover(null, null, "");
-  };
-
-  const makeActivePoint = () => {
-    return (
-      <circle
-        className="linechart_point"
-        style={{ stroke: color }}
-        r={pointRadius}
-        cx={activePoint?.svgX}
-        cy={activePoint?.svgY}
-      />
-    );
-  };
-
-  const createLine = () => {
-    return (
-      <line
-        className="hoverLine"
-        x1={hoverLoc!}
-        y1={-8}
-        x2={hoverLoc!}
-        y2={svgHeight - xLabelSize}
-      />
-    );
-  };
-
   return (
-    <svg
-      width={svgWidth}
-      height={svgHeight}
-      viewBox={`0 0 ${svgWidth} ${svgHeight}`}
-      className={"linechart"}
-      onMouseLeave={stopHover}
-      onMouseMove={(e) => getCoords(e)}
-    >
-      <g>
-        {makeAxis()}
-        {makePath()}
-        {makeArea()}
-        {makeLabels()}
-        {hoverLoc ? createLine() : null}
-        {hoverLoc ? makeActivePoint() : null}
-      </g>
-    </svg>
+    <figure className="w-full min-w-0">
+      <svg viewBox={`0 0 ${width} ${height}`} className="linechart" role="img"
+        aria-label={`Bitcoin daily closing prices from ${first.d} to ${last.d}`}
+        onPointerMove={choosePoint} onPointerLeave={() => setSelected(null)}>
+        <title>Bitcoin daily closing prices</title>
+        <desc>From {first.p} on {first.d} to {last.p} on {last.d}.</desc>
+        {[scale.min, scale.max].map(value => <g key={value}>
+          <line x1={left} x2={width} y1={y(value)} y2={y(value)} stroke="#64748b" strokeDasharray="5" />
+          <text x={left - 10} y={y(value) + 5} textAnchor="end" fill="#99f6e4" fontSize="16">{label(value)}</text>
+        </g>)}
+        <path d={`${line} L ${x(last.x)} ${bottom} L ${x(first.x)} ${bottom} Z`} fill="#2dd4bf" opacity="0.12" />
+        <path d={line} fill="none" stroke="#2dd4bf" strokeWidth="3" />
+        <text x={left} y={height - 5} fill="#99f6e4" fontSize="16">{first.d}</text>
+        <text x={width - 10} y={height - 5} fill="#99f6e4" fontSize="16" textAnchor="end">{last.d}</text>
+        {active && <circle cx={x(active.x)} cy={y(active.y)} r="5" fill="#fff" stroke="#2dd4bf" />}
+      </svg>
+      <figcaption className="min-h-6 text-center text-sm text-teal-200">{active ? `${active.d}: ${active.p}` : "Hover or touch the chart to inspect a daily close."}</figcaption>
+      <details className="mt-3 text-sm">
+        <summary className="cursor-pointer text-teal-200">View daily prices</summary>
+        <div className="mt-2 max-h-60 overflow-auto">
+          <table className="w-full text-left"><caption className="sr-only">Daily closing prices</caption>
+            <thead><tr><th scope="col">Date (UTC)</th><th scope="col">Price</th></tr></thead>
+            <tbody>{points.map(point => <tr key={point.x}><td>{point.d}</td><td>{point.p}</td></tr>)}</tbody>
+          </table>
+        </div>
+      </details>
+    </figure>
   );
-};
-
-export default LineChart;
+}
