@@ -2,9 +2,9 @@ import { getStore } from "@netlify/blobs";
 export const store = () =>
   getStore({
     name:
-      process.env.CONTEXT === "deploy-preview"
-        ? "daily-bitcoin-preview-v1"
-        : "daily-bitcoin-v1",
+      process.env.NEWSLETTER_ENV === "production"
+        ? "daily-bitcoin-v1"
+        : "daily-bitcoin-preview-v1",
     consistency: "strong",
   });
 export const json = (body, status = 200) =>

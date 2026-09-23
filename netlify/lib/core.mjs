@@ -39,7 +39,7 @@ export function conversion(btc, rate, cents) {
 export const day = () => new Date().toISOString().slice(0, 10);
 export const ready = () =>
   Boolean(
-    process.env.CONTEXT === "production" &&
+    process.env.NEWSLETTER_ENV === "production" &&
     process.env.RESEND_WEBHOOK_SECRET &&
     process.env.RESEND_API_KEY &&
     process.env.NEWSLETTER_FROM &&

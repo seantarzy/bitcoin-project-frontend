@@ -23,7 +23,7 @@ assert.equal((await post(form, "https://other.example")).status, 403);
 assert.equal((await post({ ...form, consent: false })).status, 400);
 assert.equal((await post(form)).status, 200);
 const site = JSON.parse(readFileSync(".netlify/state.json")).siteId;
-const file = `.netlify/blobs-serve/entries/${site}/site:daily-bitcoin-v1/subscribers/${hash(email)}`;
+const file = `.netlify/blobs-serve/entries/${site}/site:daily-bitcoin-preview-v1/subscribers/${hash(email)}`;
 const read = () => JSON.parse(readFileSync(file, "utf8"));
 const first = read();
 assert.equal(first.status, "pending");

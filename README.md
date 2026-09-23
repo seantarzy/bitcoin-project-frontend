@@ -78,6 +78,7 @@ Signup safely collects pending early-access requests before these settings exist
 
 Configure production Netlify environment variables (secrets must never enter Git or `NEXT_PUBLIC_*`):
 
+- `NEWSLETTER_ENV=production`: explicitly marks production functions; all other environments use the isolated preview store and cannot send. Already configured for the production deploy context.
 - `RESEND_API_KEY`: key for an account with the site's sending domain verified, including its required DNS records.
 - `NEWSLETTER_FROM`: verified sender, e.g. `The Daily Bitcoin <daily@whatsbitcoinsprice.com>`.
 - `NEWSLETTER_POSTAL_ADDRESS`: the publisher's valid mailing address for the footer.
