@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState, type FormEvent } from "react";
 import Link from "next/link";
+import ProductPhoto from "./ProductPhoto";
 import { ArrowUpRight, Mail, ArrowRight, Check, Share2 } from "lucide-react";
 import { track } from "@/services/analytics";
 export type Edition = {
@@ -10,6 +11,7 @@ export type Edition = {
   headline: string;
   description: string;
   emoji: string;
+  imageUrl?: string;
   category: string;
   priceCents: number;
   rate: number;
@@ -273,8 +275,8 @@ export default function DailyBitcoin({
             </div>
             <div className="daily-feature">
               <div className="daily-illustration">
-                <span aria-hidden="true">{current.emoji}</span>
-                <small>EDITORIAL ILLUSTRATION · NOT A PRODUCT PHOTO</small>
+                <ProductPhoto src={current.imageUrl} alt={current.title} />
+                <small>PRODUCT PHOTO · {current.merchant}</small>
                 <div className="daily-sticker">
                   REAL ITEM.
                   <br />

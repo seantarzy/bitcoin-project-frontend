@@ -69,12 +69,29 @@ test("verification rejects unavailable and malformed offers, preserves exact var
   const original = global.fetch;
   try {
     global.fetch = async () =>
-      Response.json({ variants: [{ id: 123, available: true, price: 1750 }] });
+      Response.json({
+        featured_image:
+          "//cdn.shopify.com/s/files/1/1365/2497/products/test.png",
+        variants: [{ id: 123, available: true, price: 1750 }],
+      });
     const result = await verify({
       url: "https://mcphee.com/products/example",
       variant: "123",
     });
     assert.equal(result.priceCents, 1750);
+    assert.equal(
+      result.imageUrl,
+      "https://cdn.shopify.com/s/files/1/1365/2497/products/test.png",
+    );
+    global.fetch = async () =>
+      Response.json({
+        featured_image: "https://untrusted.example/image.png",
+        variants: [{ id: 123, available: true, price: 1750 }],
+      });
+    await assert.rejects(
+      () => verify({ url: "https://mcphee.com/products/example" }),
+      /No trusted product photo/,
+    );
     assert.equal(
       result.sourceUrl,
       "https://mcphee.com/products/example?variant=123",

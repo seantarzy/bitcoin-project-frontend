@@ -1,4 +1,5 @@
 type EventName =
+  | "daily_teaser_click"
   | "newsletter_signup"
   | "daily_vote"
   | "daily_share"

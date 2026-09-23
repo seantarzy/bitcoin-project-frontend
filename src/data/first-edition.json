@@ -5,7 +5,7 @@
   "url": "https://mcphee.com/products/emotional-support-chicken",
   "variant": "31937150025801",
   "category": "Everyday absurdities",
-  "emoji": "🐔",
+  "emoji": "\ud83d\udc14",
   "headline": "Your portfolio needs emotional support.",
   "description": "A tiny vest. A very loud squawk. A wonderfully ridiculous way to put Bitcoin into perspective.",
   "priceCents": 1750,
@@ -14,5 +14,6 @@
   "sourceUrl": "https://mcphee.com/products/emotional-support-chicken?variant=31937150025801",
   "date": "2026-09-23",
   "rate": 84454.15,
-  "quoteAt": "2026-09-23T14:59:54.273Z"
+  "quoteAt": "2026-09-23T14:59:54.273Z",
+  "imageUrl": "https://cdn.shopify.com/s/files/1/1365/2497/products/emotional-support-chicken.png?v=1665809017"
 }

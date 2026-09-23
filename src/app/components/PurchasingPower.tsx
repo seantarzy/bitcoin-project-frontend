@@ -1,4 +1,6 @@
 "use client";
+import ProductPhoto from "./ProductPhoto";
+import type { Edition } from "./DailyBitcoin";
 import { useCallback, useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
@@ -46,8 +48,10 @@ const categories = [
 
 export default function PurchasingPower({
   initialData,
+  dailyEdition,
 }: {
   initialData: MarketData;
+  dailyEdition: Edition;
 }) {
   const [market, setMarket] = useState(initialData);
   const [amount, setAmount] = useState("1");
@@ -380,14 +384,38 @@ export default function PurchasingPower({
         </button>
       </header>
       <main>
-        <aside className="daily-teaser wrap">
-          <div>
-            <strong>A real find. A Bitcoin twist.</strong>
-            <p>
-              Meet The Daily Bitcoin: checked prices, unexpected possibilities.
-            </p>
-          </div>
-          <Link href="/daily">See the daily find ↗</Link>
+        <aside className="wrap daily-teaser-wrap">
+          <Link
+            className="daily-teaser"
+            href={`/daily?edition=${dailyEdition.date}`}
+            onClick={() =>
+              track("daily_teaser_click", { item_id: dailyEdition.id })
+            }
+          >
+            <div className="daily-teaser-copy">
+              <span className="daily-teaser-label">
+                <i /> THE DAILY BITCOIN / LATEST FIND
+              </span>
+              <h2>
+                Yes, this is real.
+                <br />
+                <em>Guess the Bitcoin price.</em>
+              </h2>
+              <p>One unexpected find. A real store. A price you have to see.</p>
+              <span className="daily-teaser-button">
+                Reveal the daily find <ArrowUpRight size={20} />
+              </span>
+              <small>New finds daily · No signup needed to explore</small>
+            </div>
+            <div className="daily-teaser-photo">
+              <ProductPhoto
+                src={dailyEdition.imageUrl}
+                alt="A preview of the latest real-world Bitcoin find"
+                priority
+              />
+              <span className="daily-teaser-tag">WAIT. HOW MUCH IN ₿?</span>
+            </div>
+          </Link>
         </aside>
         <section className="hero wrap">
           <div className="hero-copy">

@@ -39,8 +39,15 @@ export async function verify(item) {
     variant.price <= 0
   )
     throw new Error("No available offer");
+  const rawImage = variant.featured_image?.src || product.featured_image;
+  const imageUrl =
+    typeof rawImage === "string" ? new URL(rawImage, item.url).href : undefined;
+  if (!imageUrl?.startsWith("https://cdn.shopify.com/s/files/1/1365/2497/")) {
+    throw new Error("No trusted product photo");
+  }
   return {
     ...item,
+    imageUrl,
     variant: String(variant.id),
     priceCents: variant.price,
     currency: "USD",
