@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://whatsbitcoinsprice.com/sitemap.xml

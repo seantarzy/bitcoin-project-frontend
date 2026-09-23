@@ -42,3 +42,17 @@ Before deploying, use the existing live site's hosting project and configured me
 ## Regression coverage
 
 Tests cover numeric prices containing thousands, malformed rates, candle sorting/ranges/freshness, currency conversion, missing baselines, flat chart scales, rate limits and provider outages. Browser verification should include USD/EUR switching, refresh, chart inspection and mobile layout.
+
+## Bitcoin in real life
+
+The homepage now presents a purchasing-power calculator. `/price` retains the detailed market dashboard. Illustrative USD budgets live in `src/services/purchasingPower.ts`; they are explicitly labeled and editable, not claimed to be retailer prices. Eight comparisons cover everyday spending, tech, experiences and large goals.
+
+Shared links encode a hypothetical BTC amount, item ID and budget in the URL fragment. Downloadable PNG cards are composed locally and include budget and quote-date context. Goals persist only in local storage. No wallet connection or account is required.
+
+### Launch measurement
+
+GA4 custom events: `calculator_used`, `category_selected`, `comparison_opened`, `benchmark_updated`, `share_opened`, `share_link_copied`, `share_card_downloaded`, `native_share_completed`, `goal_saved`. Parameters are limited to item/category/method: never BTC amounts, budgets or goal names. The configured analytics page address excludes fragments. A download event records creation of a download, not a confirmed social post.
+
+Evaluate the first release after 30 days or 500 engaged visitors, whichever comes later. Compare calculator-use rate, comparison opens, successful share actions per user, and returning-user rate against the prior baseline. Treat these as a product experiment, not a promised traffic lift. Register `item_id` and `category` as event-scoped custom dimensions in GA4 to compare individual items. Traffic acquisition should be reviewed alongside engagement; this release does not itself supply distribution or advertising demand.
+
+Original hero artwork is generated for this project. No stock photography or named products are used as price evidence. Ads are not enabled in this release; first establish engagement and repeat use.

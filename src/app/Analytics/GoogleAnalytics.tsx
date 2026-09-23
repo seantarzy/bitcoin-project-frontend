@@ -20,6 +20,8 @@ const GoogleAnalytics = () => {
               gtag('js', new Date());
               gtag('config', '${process.env.NEXT_PUBLIC_MEASUREMENT_ID}', {
               page_path: window.location.pathname,
+              page_location: window.location.origin + window.location.pathname,
+              allow_google_signals: false,
               });
           `}
       </Script>

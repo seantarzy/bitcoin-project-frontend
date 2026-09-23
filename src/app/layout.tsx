@@ -5,15 +5,21 @@ import "./globals.css";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "What's Bitcoin's Price?",
-  description: "Check Bitcoin prices in your currency and explore the last 30 days of daily closing prices, with clear historical comparisons.",
+  metadataBase: new URL("https://whatsbitcoinsprice.com"),
+  title: "What can your Bitcoin buy? · Bitcoin in real life",
+  description:
+    "Coffee runs or a dream getaway? Turn a hypothetical Bitcoin amount into real-life possibilities. Explore, customize and share your perspective.",
   openGraph: {
-    title: "What's Bitcoin's Price?",
-    description: "Bitcoin prices and 30-day historical comparisons.",
+    title: "Bitcoin. But make it real life.",
+    description:
+      "Same bitcoin. A different kind of rich. See what your Bitcoin could buy.",
     url: "https://whatsbitcoinsprice.com/",
-    type: "website"
-  }
-
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Bitcoin. But make it real life.",
+  },
 };
 
 export default function RootLayout({
