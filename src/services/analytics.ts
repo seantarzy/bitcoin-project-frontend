@@ -1,4 +1,8 @@
 type EventName =
+  | "newsletter_signup"
+  | "daily_vote"
+  | "daily_share"
+  | "daily_merchant_click"
   | "calculator_used"
   | "category_selected"
   | "comparison_opened"

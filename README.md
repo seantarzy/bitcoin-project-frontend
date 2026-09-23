@@ -56,3 +56,40 @@ GA4 custom events: `calculator_used`, `category_selected`, `comparison_opened`, 
 Evaluate the first release after 30 days or 500 engaged visitors, whichever comes later. Compare calculator-use rate, comparison opens, successful share actions per user, and returning-user rate against the prior baseline. Treat these as a product experiment, not a promised traffic lift. Register `item_id` and `category` as event-scoped custom dimensions in GA4 to compare individual items. Traffic acquisition should be reviewed alongside engagement; this release does not itself supply distribution or advertising demand.
 
 Original hero artwork is generated for this project. No stock photography or named products are used as price evidence. Ads are not enabled in this release; first establish engagement and repeat use.
+
+## The Daily Bitcoin
+
+`/daily` contains the sourced daily item, archived editions, both BTC conversions, voting, and newsletter signup. The homepage links to it. Edition prices are immutable dated snapshots, not promises of current stock or bulk availability. Merchant links are ordinary links, with no affiliate attribution or ads enabled. Artwork is an editorial emoji illustration, not a product photograph.
+
+### Data and schedules
+
+Native Netlify functions use a strongly consistent site Blobs store `daily-bitcoin-v1`. Deploy previews use `daily-bitcoin-preview-v1`; Netlify Dev uses local storage. No subscriber data is exposed by the public edition feed. Run `netlify dev` for the complete local flow; plain `next dev` does not serve newsletter/voting endpoints.
+
+- `daily-publish`: 06:00 UTC daily. Refreshes the reviewed watchlist in `netlify/lib/catalog.mjs`, excludes recently featured products, validates exact in-stock variants and prices, fetches Coinbase BTC/USD, and saves one edition. No valid offer means no publication. `netlify functions:invoke daily-publish` tests it locally.
+- `daily-dispatch`: 13:00 UTC daily. Triggers authenticated background sending only when explicitly enabled. Weekly subscribers receive the Sunday pick. Schedules remain UTC through daylight saving changes.
+- `daily-send-background`: rechecks the product before edition delivery, sends confirmations to pending early-access signups, sends only to confirmed eligible subscribers, and keeps a persistent delivery ledger plus provider idempotency keys. Current editions only; no old-edition retry after 24 hours. The small-list launch worker needs batching/queues before approaching its 15-minute limit (~1,000 recipients); it is not a high-volume mailing system.
+- `email-events`: verified Resend/Svix webhook suppresses bounced and complained recipients.
+
+The catalog starts with ten manually selected novelty products from Archie McPhee. It is an automated **price-checking and publishing watchlist**, not unrestricted AI discovery. Expand it with reviewed merchants/products and licensed photographs. Cars, homes, Amazon and interest-based segmentation remain future integrations. Do not scrape arbitrary user-submitted URLs. Products are USD storefront prices in cents; package counts follow the actual listing.
+
+### Activate email delivery
+
+Signup safely collects pending early-access requests before these settings exist. It does **not** claim a message was sent. The UI switches to confirmation-based signup only when the production sender is ready.
+
+Configure production Netlify environment variables (secrets must never enter Git or `NEXT_PUBLIC_*`):
+
+- `NEWSLETTER_ENV=production`: explicitly marks production functions; all other environments use the isolated preview store and cannot send. Already configured for the production deploy context.
+- `RESEND_API_KEY`: key for an account with the site's sending domain verified, including its required DNS records.
+- `NEWSLETTER_FROM`: verified sender, e.g. `The Daily Bitcoin <daily@whatsbitcoinsprice.com>`.
+- `NEWSLETTER_POSTAL_ADDRESS`: the publisher's valid mailing address for the footer.
+- `RESEND_WEBHOOK_SECRET`: configure the webhook at `https://whatsbitcoinsprice.com/.netlify/functions/email-events` for `email.bounced` and `email.complained`.
+- `NEWSLETTER_JOB_SECRET`: random server-only secret shared by dispatch/background worker.
+- `NEWSLETTER_SEND_ENABLED=true`: enable scheduled confirmation and edition delivery **after** testing a real confirmed subscriber and unsubscribe/bounce handling. Without this switch, scheduled emails do not send.
+
+Confirmation is an explicit POST from the private email link; scanner GET requests do not subscribe/unsubscribe anyone. Tokens use URL fragments on the preferences page, are removed from the address bar, and that page does not load Analytics. One-click unsubscribe headers support explicit mailbox-provider POST requests. Hypothetical BTC preferences are private and never sent to GA or included in public edition links.
+
+### Measurement and editorial operations
+
+New GA events: `newsletter_signup` (request accepted, **not** confirmed subscription), `daily_vote`, `daily_share`, `daily_merchant_click`. Parameters remain restricted to item IDs and action methods. Confirmation/delivery counts come from stored subscriber status and the delivery ledger; no email address or BTC amount goes to GA. Vote cookies are a lightweight one-browser-per-edition control, not a fraud-proof public poll; totals are not displayed.
+
+Check Netlify job logs after launch. Add reviewed products rather than repeating a failed listing, and monitor signup-to-confirmation, email-driven engaged visits, merchant clicks, unsubscribes and repeat visits. A manual first-week editorial review is recommended. Signup controls include a honeypot, consent, input length limits, and IP rate limiting; add a bot challenge and stronger distributed throttling if abuse grows.

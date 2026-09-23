@@ -37,3 +37,6 @@ next-env.d.ts
 
 # compiled regression tests
 /.test-build/
+
+# Local Netlify folder
+.netlify

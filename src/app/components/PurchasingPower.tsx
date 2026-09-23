@@ -365,7 +365,7 @@ export default function PurchasingPower({
           </span>
         </Link>
         <nav aria-label="Main navigation">
-          <a href="#possibilities">The possibilities</a>
+          <Link href="/daily">The Daily Bitcoin</Link>
           <a href="#how-it-works">How it works</a>
           <Link href="/price" className="nav-price">
             Price chart <ArrowUpRight size={14} />
@@ -380,6 +380,15 @@ export default function PurchasingPower({
         </button>
       </header>
       <main>
+        <aside className="daily-teaser wrap">
+          <div>
+            <strong>A real find. A Bitcoin twist.</strong>
+            <p>
+              Meet The Daily Bitcoin: checked prices, unexpected possibilities.
+            </p>
+          </div>
+          <Link href="/daily">See the daily find ↗</Link>
+        </aside>
         <section className="hero wrap">
           <div className="hero-copy">
             <div className="eyebrow">
