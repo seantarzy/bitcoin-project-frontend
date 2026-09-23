@@ -1,6 +1,6 @@
 import { Webhook } from "svix";
 import { store, json } from "../lib/storage.mjs";
-import { hash } from "../lib/core.mjs";
+import { hash, isNewsletterEvent } from "../lib/core.mjs";
 export default async (request) => {
   if (request.method !== "POST")
     return json({ error: "Method not allowed" }, 405);
@@ -11,6 +11,8 @@ export default async (request) => {
       await request.text(),
       Object.fromEntries(request.headers),
     );
+    if (!isNewsletterEvent(event, process.env.NEWSLETTER_FROM))
+      return json({ ok: true });
     if (["email.bounced", "email.complained"].includes(event.type)) {
       const db = store();
       for (const email of event.data.to || []) {

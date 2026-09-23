@@ -52,3 +52,17 @@ export function due(subscriber, date) {
       new Date(date + "T12:00:00Z").getUTCDay() === 0)
   );
 }
+
+// A Resend account can host multiple products. Never suppress newsletter readers
+// because another product sent an email to the same recipient.
+export function isNewsletterEvent(event, configuredFrom) {
+  const mailbox = (value) => {
+    if (typeof value !== "string") return null;
+    const address = (
+      value.trim().match(/<([^<>]+)>$/)?.[1] || value.trim()
+    ).toLowerCase();
+    return /^[^\s<>@]+@[^\s<>@]+\.[^\s<>@]+$/.test(address) ? address : null;
+  };
+  const expected = mailbox(configuredFrom);
+  return Boolean(expected && mailbox(event?.data?.from) === expected);
+}

@@ -93,3 +93,25 @@ test("verification rejects unavailable and malformed offers, preserves exact var
     global.fetch = original;
   }
 });
+
+test("webhooks only suppress recipients for the configured newsletter sender", async () => {
+  const { isNewsletterEvent } = await import("../netlify/lib/core.mjs");
+  const sender = "The Daily Bitcoin <daily@mail.whatsbitcoinsprice.com>";
+  assert.equal(isNewsletterEvent({ data: { from: sender } }, sender), true);
+  assert.equal(
+    isNewsletterEvent(
+      { data: { from: "daily@mail.whatsbitcoinsprice.com" } },
+      sender,
+    ),
+    true,
+  );
+  assert.equal(
+    isNewsletterEvent(
+      { data: { from: "Different project <hello@magicbard.com>" } },
+      sender,
+    ),
+    false,
+  );
+  assert.equal(isNewsletterEvent({ data: { from: sender } }, undefined), false);
+  assert.equal(isNewsletterEvent({ data: {} }, sender), false);
+});
