@@ -15,6 +15,18 @@ export default function Privacy() {
         local storage. Clear this site’s browser data to remove them. Our custom
         analytics events do not include your BTC amount, goal name, or budget.
       </p>
+      <h2>The Daily Bitcoin newsletter</h2>
+      <p>
+        If you sign up, we store your email, optional hypothetical BTC amount,
+        frequency, consent date and subscription status on Netlify. Resend
+        processes your email to deliver confirmation and newsletter messages
+        once delivery is enabled. Pending early-access signups receive a
+        confirmation request before regular editions. Private links let you
+        confirm, change preferences or unsubscribe. We retain an unsubscribe
+        record to prevent further mail. Newsletter inputs are not sent to Google
+        Analytics. Voting uses an anonymous browser cookie to update one vote
+        per edition; clearing cookies can reset this identifier.
+      </p>
       <h2>Sharing</h2>
       <p>
         Copying a comparison link includes the hypothetical amount, the selected
@@ -41,9 +53,12 @@ export default function Privacy() {
       </p>
       <h2>About the comparisons</h2>
       <p>
-        All item budgets are editable illustrations, not live product quotes or
-        purchase offers. Bitcoin conversion values exclude fees and taxes. This
-        is a tool for perspective, not financial advice.
+        Calculator budgets are editable illustrations. Daily Bitcoin editions
+        instead preserve a specific merchant listing price and verification
+        timestamp; check the merchant for current stock and pricing. Neither is
+        a guarantee of bulk inventory or Bitcoin payment acceptance. These are
+        not purchase offers. Bitcoin conversion values exclude fees and taxes.
+        This is a tool for perspective, not financial advice.
       </p>
     </main>
   );

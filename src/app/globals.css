@@ -1486,3 +1486,508 @@ h2 {
     font-size: 8px;
   }
 }
+
+/* Daily Bitcoin: an editorial companion to the calculator. */
+.daily-nav {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-block: 28px;
+  border-bottom: 1px solid #343630;
+  gap: 18px;
+}
+.daily-nav > a {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 700;
+}
+.daily-nav span {
+  font-weight: 400;
+  color: #afb0a6;
+}
+.daily-page {
+  padding-bottom: 30px;
+}
+.daily-masthead {
+  position: relative;
+  padding: 80px 0 60px;
+}
+.daily-eyebrow {
+  font-size: 11px;
+  letter-spacing: 2px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #dafa5c;
+}
+.daily-masthead h1 {
+  font-size: clamp(68px, 10vw, 142px);
+  line-height: 0.91;
+  letter-spacing: -0.065em;
+  margin: 24px 0;
+}
+.daily-page em {
+  font-style: normal;
+  color: #dafa5c;
+}
+.daily-masthead > p {
+  position: absolute;
+  right: 0;
+  bottom: 64px;
+  color: #aaa99e;
+  line-height: 1.7;
+}
+.daily-edition {
+  background: #20221e;
+  border: 1px solid #393b32;
+  border-radius: 24px;
+  padding: 28px;
+}
+.daily-edition-top {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 10px;
+  letter-spacing: 2px;
+  color: #c2c4b9;
+  border-bottom: 1px solid #3a3d32;
+  padding-bottom: 22px;
+}
+.daily-feature {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 50px;
+  padding: 32px 0;
+}
+.daily-illustration {
+  background: #dafa5c;
+  border-radius: 16px;
+  min-height: 380px;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  background-image: radial-gradient(#a8c144 1px, transparent 1px);
+  background-size: 18px 18px;
+}
+.daily-illustration > span {
+  font-size: 180px;
+  filter: drop-shadow(12px 22px 6px #52611650);
+  transform: rotate(-12deg);
+}
+.daily-illustration small {
+  position: absolute;
+  bottom: 16px;
+  left: 12px;
+  right: 12px;
+  text-align: center;
+  font-size: 8px;
+  letter-spacing: 1px;
+  color: #46531d;
+}
+.daily-sticker {
+  position: absolute;
+  right: 16px;
+  top: 20px;
+  transform: rotate(12deg);
+  background: #171813;
+  color: #dafa5c;
+  padding: 18px;
+  border-radius: 50%;
+  font-size: 12px;
+  line-height: 1.2;
+  font-weight: 800;
+}
+.daily-story {
+  align-self: center;
+}
+.daily-story h2 {
+  font-size: clamp(32px, 4vw, 54px);
+  letter-spacing: -2px;
+  line-height: 1.05;
+  margin: 16px 0;
+}
+.daily-story > p {
+  color: #b9bbae;
+  line-height: 1.65;
+}
+.daily-story h3 {
+  font-size: 15px;
+  margin-top: 28px;
+}
+.daily-story .daily-list-price {
+  color: #f9f9ee;
+  font-size: 24px;
+  margin: 10px 0;
+}
+.daily-list-price span {
+  font-size: 13px;
+  color: #b9bbae;
+}
+.daily-story > a {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  border-bottom: 1px solid #dafa5c;
+  padding-bottom: 4px;
+  color: #dafa5c;
+  font-size: 13px;
+}
+.daily-math {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  border-block: 1px solid #393d32;
+  padding: 26px 0;
+  gap: 24px;
+}
+.daily-math label,
+.daily-math small {
+  font-size: 10px;
+  letter-spacing: 1.3px;
+  color: #adb09e;
+}
+.daily-math strong {
+  display: block;
+  font-size: 48px;
+  line-height: 1.3;
+  letter-spacing: -2px;
+  color: #dafa5c;
+  overflow-wrap: anywhere;
+}
+.daily-math strong.daily-btc {
+  font-size: 30px;
+  line-height: 2.1;
+  letter-spacing: -1px;
+}
+.daily-math span {
+  font-size: 12px;
+  color: #b3b7a7;
+}
+.daily-page input,
+.daily-page select,
+.daily-preferences input,
+.daily-preferences select {
+  display: block;
+  width: 100%;
+  background: #141613;
+  color: #f7f8ef;
+  border: 1px solid #505447;
+  border-radius: 8px;
+  padding: 14px;
+  font: inherit;
+  margin-top: 10px;
+  min-width: 0;
+}
+.daily-math input {
+  font-size: 32px;
+  max-width: 200px;
+}
+.daily-proof {
+  font-size: 11px;
+  line-height: 1.7;
+  color: #a5aa99;
+  margin: 20px 0;
+}
+.daily-voting {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border-top: 1px solid #393d32;
+  padding-top: 22px;
+}
+.daily-voting > div {
+  margin-right: auto;
+}
+.daily-voting h3 {
+  font-size: 17px;
+  margin: 0 0 5px;
+}
+.daily-voting p {
+  font-size: 12px;
+  color: #a5aa99;
+  margin: 0;
+}
+.daily-page button,
+.daily-preferences button {
+  cursor: pointer;
+  border: 1px solid #525748;
+  background: transparent;
+  color: #eee;
+  border-radius: 8px;
+  padding: 13px 17px;
+  font: inherit;
+  font-size: 12px;
+}
+.daily-page button:hover,
+.daily-page button[aria-pressed="true"] {
+  border-color: #dafa5c;
+  color: #dafa5c;
+}
+.daily-page button:disabled,
+.daily-preferences button:disabled {
+  opacity: 0.5;
+  cursor: wait;
+}
+.daily-signup {
+  margin: 64px 0;
+  background: #dafa5c;
+  color: #171a12;
+  border-radius: 24px;
+  padding: 44px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 64px;
+}
+.daily-signup .daily-eyebrow {
+  color: #39411e;
+}
+.daily-signup h2 {
+  font-size: clamp(35px, 4vw, 52px);
+  letter-spacing: -2px;
+  line-height: 1.1;
+  margin: 20px 0;
+}
+.daily-signup em {
+  color: #627728;
+}
+.daily-signup p {
+  line-height: 1.7;
+  font-size: 14px;
+}
+.daily-signup form > label,
+.daily-form-row label {
+  font-size: 12px;
+  font-weight: 600;
+}
+.daily-signup input,
+.daily-signup select {
+  background: #eaffac;
+  border-color: #a8bc73;
+  color: #1d2610;
+}
+.daily-form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-top: 20px;
+}
+.daily-form-row label span {
+  font-weight: 400;
+}
+.daily-page .daily-small {
+  font-size: 11px;
+  line-height: 1.6;
+}
+.daily-signup .daily-consent {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  line-height: 1.6;
+  font-weight: 400;
+  margin: 18px 0;
+}
+.daily-consent input {
+  width: 16px;
+  height: 16px;
+  margin-top: 2px;
+  flex-shrink: 0;
+}
+.daily-page button.daily-primary,
+.daily-preferences button.daily-primary {
+  background: #161a10;
+  color: #e0ff72;
+  border-color: #161a10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 16px 20px;
+  font-weight: 600;
+  width: 100%;
+}
+.daily-honey {
+  position: absolute;
+  left: -10000px;
+}
+.daily-signup a {
+  text-decoration: underline;
+}
+.daily-success {
+  padding: 25px 0;
+}
+.daily-success button {
+  color: #171a12;
+}
+.daily-archive {
+  padding: 20px 0 60px;
+}
+.daily-archive h2 {
+  font-size: 32px;
+  letter-spacing: -1px;
+  margin: 20px 0 28px;
+}
+.daily-archive-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 18px;
+}
+.daily-archive-grid button {
+  text-align: left;
+  background: #20221e;
+  padding: 24px;
+}
+.daily-archive-grid button > span {
+  font-size: 44px;
+  display: block;
+  margin-bottom: 24px;
+}
+.daily-archive-grid small {
+  color: #a6ad95;
+}
+.daily-archive-grid h3 {
+  font-size: 20px;
+}
+.daily-archive-grid p {
+  font-size: 12px;
+  color: #c4cab6;
+}
+.daily-footer {
+  border-top: 1px solid #3d4333;
+  padding-top: 24px;
+  display: flex;
+  gap: 25px;
+  font-size: 12px;
+  color: #a6ad95;
+  flex-wrap: wrap;
+}
+.daily-footer p {
+  margin-left: auto;
+}
+.daily-empty {
+  padding: 40px;
+  background: #25281e;
+  border-radius: 20px;
+}
+.daily-preferences {
+  max-width: 600px;
+  padding-block: 60px;
+}
+.daily-preferences h1 {
+  font-size: 45px;
+  letter-spacing: -2px;
+}
+.daily-preferences label {
+  display: block;
+  margin-block: 20px;
+}
+.daily-preferences button {
+  margin: 12px 0;
+}
+.daily-teaser {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 28px 32px;
+  border: 1px solid #52612a;
+  border-radius: 16px;
+  margin-top: 28px;
+  margin-bottom: 28px;
+  background: #202719;
+}
+.daily-teaser p {
+  margin: 7px 0 0;
+  color: #b4bea0;
+  font-size: 13px;
+}
+.daily-teaser a {
+  color: #dafa5c;
+  white-space: nowrap;
+  font-size: 14px;
+}
+.daily-teaser strong {
+  font-size: 19px;
+}
+@media (max-width: 760px) {
+  .daily-nav {
+    padding-block: 20px;
+    font-size: 12px;
+  }
+  .daily-nav span {
+    display: none;
+  }
+  .daily-masthead {
+    padding: 48px 0 30px;
+  }
+  .daily-masthead > p {
+    position: static;
+    font-size: 14px;
+    margin-top: 26px;
+  }
+  .daily-edition {
+    padding: 18px;
+    border-radius: 16px;
+  }
+  .daily-feature {
+    grid-template-columns: 1fr;
+    gap: 24px;
+    padding: 20px 0;
+  }
+  .daily-illustration {
+    min-height: 280px;
+  }
+  .daily-illustration > span {
+    font-size: 150px;
+  }
+  .daily-math {
+    grid-template-columns: 1fr 1fr;
+    gap: 18px;
+  }
+  .daily-math > label {
+    grid-column: 1/-1;
+  }
+  .daily-math input {
+    max-width: none;
+  }
+  .daily-math strong {
+    font-size: 36px;
+  }
+  .daily-math strong.daily-btc {
+    font-size: 22px;
+    line-height: 2;
+  }
+  .daily-voting {
+    flex-wrap: wrap;
+  }
+  .daily-voting > div {
+    width: 100%;
+    margin-bottom: 8px;
+  }
+  .daily-voting button {
+    padding: 12px;
+    font-size: 11px;
+  }
+  .daily-signup {
+    padding: 26px;
+    grid-template-columns: 1fr;
+    gap: 24px;
+    margin: 36px 0;
+  }
+  .daily-form-row {
+    grid-template-columns: 1fr;
+  }
+  .daily-archive-grid {
+    grid-template-columns: 1fr;
+  }
+  .daily-footer p {
+    margin-left: 0;
+  }
+  .daily-teaser {
+    align-items: flex-start;
+    flex-direction: column;
+    padding: 24px;
+  }
+}
