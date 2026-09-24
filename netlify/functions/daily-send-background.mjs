@@ -1,3 +1,9 @@
+import {
+  kitSelected,
+  kitReady,
+  enrollKit,
+  dispatchKitEdition,
+} from "../lib/kit.mjs";
 import { store, json } from "../lib/storage.mjs";
 import {
   day,
@@ -17,7 +23,12 @@ export default async (request) => {
       `Bearer ${process.env.NEWSLETTER_JOB_SECRET}`
   )
     return json({ error: "Unauthorized" }, 401);
-  if (!ready() || process.env.NEWSLETTER_SEND_ENABLED !== "true") return;
+  if (
+    kitSelected()
+      ? !kitReady()
+      : !ready() || process.env.NEWSLETTER_SEND_ENABLED !== "true"
+  )
+    return;
   const db = store();
   const date = day();
   const edition = await db.get(`editions/${date}`, { type: "json" });
@@ -36,6 +47,16 @@ export default async (request) => {
     }
   }
   const { blobs } = await db.list({ prefix: "subscribers/" });
+  if (kitSelected()) {
+    for (const blob of blobs) {
+      const sub = await db.get(blob.key, { type: "json" });
+      if (sub?.status === "pending" && !sub.kitEnrolledAt) {
+        await enrollKit(sub, (value) => db.setJSON(blob.key, value));
+      }
+    }
+    if (verified) await dispatchKitEdition(db, edition);
+    return;
+  }
   for (const blob of blobs) {
     const sub = await db.get(blob.key, { type: "json" });
     if (!sub) continue;

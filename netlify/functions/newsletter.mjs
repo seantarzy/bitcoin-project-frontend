@@ -1,3 +1,12 @@
+import {
+  kitSelected,
+  kitReady,
+  enrollKit,
+  unsubscribeKit,
+  syncKitPreferences,
+  kitRequest,
+  kitStatus,
+} from "../lib/kit.mjs";
 import { store, json, readBody, sameOrigin } from "../lib/storage.mjs";
 import {
   preferences,
@@ -12,7 +21,8 @@ export default async (request, context) => {
   try {
     const db = store();
     const url = new URL(request.url);
-    if (request.method === "GET") return json({ sendingEnabled: ready() });
+    if (request.method === "GET")
+      return json({ sendingEnabled: kitSelected() ? kitReady() : ready() });
     if (request.method !== "POST")
       return json({ error: "Method not allowed" }, 405);
     const unsubscribe = url.searchParams.get("unsubscribe");
@@ -21,6 +31,7 @@ export default async (request, context) => {
       if (id) {
         const sub = await db.get(`subscribers/${id}`, { type: "json" });
         if (sub && sub.token === unsubscribe) {
+          if (sub.provider === "kit") await unsubscribeKit(sub);
           sub.status = "unsubscribed";
           await db.setJSON(`subscribers/${id}`, sub);
         }
@@ -30,12 +41,33 @@ export default async (request, context) => {
     if (!sameOrigin(request))
       return json({ error: "Invalid request origin" }, 403);
     const body = await readBody(request);
-    if (body.website) return json({ message: "Check your inbox." });
+    if (body.website)
+      return json({
+        message: "Check your inbox.",
+        outcome: "request_accepted",
+      });
     if (body.token) {
       const id = await db.get(`tokens/${hash(String(body.token))}`);
       const sub = id && (await db.get(`subscribers/${id}`, { type: "json" }));
       if (!sub || sub.token !== body.token)
         return json({ error: "This link is invalid." }, 400);
+      if (
+        sub.provider === "kit" &&
+        sub.kitId &&
+        ["read", "confirm"].includes(body.action)
+      ) {
+        const result = await kitRequest(`/subscribers/${sub.kitId}`);
+        sub.status = kitStatus(result.subscriber.state);
+        await db.setJSON(`subscribers/${id}`, sub);
+        if (body.action === "confirm")
+          return json({
+            message:
+              sub.status === "confirmed"
+                ? "Your subscription is confirmed."
+                : "Please use the confirmation button in your Kit email.",
+            status: sub.status,
+          });
+      }
       if (body.action === "read")
         return json({
           frequency: sub.frequency,
@@ -47,11 +79,14 @@ export default async (request, context) => {
           return json({ error: "Please subscribe again on the site." }, 400);
         sub.status = "confirmed";
         sub.confirmedAt = new Date().toISOString();
-      } else if (body.action === "unsubscribe") sub.status = "unsubscribed";
-      else if (body.action === "update") {
+      } else if (body.action === "unsubscribe") {
+        if (sub.provider === "kit") await unsubscribeKit(sub);
+        sub.status = "unsubscribed";
+      } else if (body.action === "update") {
         const prefs = preferences({ ...body, email: sub.email });
         sub.btc = prefs.btc;
         sub.frequency = prefs.frequency;
+        if (sub.provider === "kit") await syncKitPreferences(sub);
       } else return json({ error: "Unknown action" }, 400);
       await db.setJSON(`subscribers/${id}`, sub);
       return json({
@@ -75,6 +110,7 @@ export default async (request, context) => {
       return json({
         message:
           "If this address is already subscribed, use the preferences link in your email. Otherwise, check your inbox.",
+        outcome: "request_accepted",
       });
     // Do not allow anonymous resubmission to overwrite pending preferences or rotate its token.
     const sub =
@@ -89,11 +125,20 @@ export default async (request, context) => {
           };
     await db.setJSON(`subscribers/${id}`, sub);
     await db.set(`tokens/${hash(sub.token)}`, id);
-    if (ready()) {
+    if (kitSelected() && kitReady()) {
+      await enrollKit(sub, (value) => db.setJSON(`subscribers/${id}`, value));
+      return json({
+        message:
+          "Check your inbox for your Daily Bitcoin confirmation. If already subscribed, use the preferences link in your email.",
+        outcome: "confirmation_requested",
+      });
+    }
+    if (!kitSelected() && ready()) {
       const confirmationKey = `confirmations/${hash(sub.token)}`;
       if (await db.get(confirmationKey))
         return json({
           message: "Check your inbox for your confirmation link.",
+          outcome: "confirmation_requested",
         });
       await send(
         sub.email,
@@ -105,11 +150,13 @@ export default async (request, context) => {
       await db.set(confirmationKey, "sent");
       return json({
         message: "Check your inbox to confirm your subscription.",
+        outcome: "confirmation_requested",
       });
     }
     return json({
       message:
         "You’re on the early-access list. We’ll send a confirmation email when delivery launches; daily emails have not started yet.",
+      outcome: "early_access",
     });
   } catch (error) {
     console.error("Newsletter request failed", error.message);

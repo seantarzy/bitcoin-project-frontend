@@ -18,14 +18,18 @@ export default function Privacy() {
       <h2>The Daily Bitcoin newsletter</h2>
       <p>
         If you sign up, we store your email, optional hypothetical BTC amount,
-        frequency, consent date and subscription status on Netlify. Resend
-        processes your email to deliver confirmation and newsletter messages
-        once delivery is enabled. Pending early-access signups receive a
-        confirmation request before regular editions. Private links let you
-        confirm, change preferences or unsubscribe. We retain an unsubscribe
-        record to prevent further mail. Newsletter inputs are not sent to Google
-        Analytics. Voting uses an anonymous browser cookie to update one vote
-        per edition; clearing cookies can reset this identifier.
+        frequency, consent date and subscription status on Netlify. Kit is our
+        planned newsletter provider; once connected, it receives your email,
+        hypothetical perspective, frequency and private preferences link to
+        manage confirmation, delivery and unsubscribes. Resend is the previous
+        delivery integration and is disabled while we move to Kit. Our
+        configured provider processes your email to deliver confirmation and
+        newsletter messages once delivery is enabled. Pending early-access
+        signups receive a confirmation request before regular editions. Private
+        links let you confirm, change preferences or unsubscribe. We retain an
+        unsubscribe record to prevent further mail. Newsletter inputs are not
+        sent to Google Analytics. Voting uses an anonymous browser cookie to
+        update one vote per edition; clearing cookies can reset this identifier.
       </p>
       <h2>Sharing</h2>
       <p>

@@ -1,7 +1,10 @@
+import { kitSelected, kitReady } from "../lib/kit.mjs";
 export default async () => {
   if (
     !process.env.NEWSLETTER_JOB_SECRET ||
-    process.env.NEWSLETTER_SEND_ENABLED !== "true"
+    (kitSelected()
+      ? !kitReady()
+      : process.env.NEWSLETTER_SEND_ENABLED !== "true")
   )
     return;
   const r = await fetch(

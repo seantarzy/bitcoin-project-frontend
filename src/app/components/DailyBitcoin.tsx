@@ -64,10 +64,19 @@ export function NewsletterForm() {
       setSent(true);
       track("newsletter_signup", {
         placement: "daily",
-        outcome: enabled ? "confirmation_requested" : "early_access",
+        outcome: [
+          "confirmation_requested",
+          "early_access",
+          "request_accepted",
+        ].includes(d.outcome)
+          ? d.outcome
+          : "request_accepted",
       });
     } catch (e) {
-      track("newsletter_error", { placement: "daily" });
+      track("newsletter_error", {
+        placement: "daily",
+        outcome: "request_failed",
+      });
       setMessage(e instanceof Error ? e.message : "Please try again.");
     } finally {
       setBusy(false);
@@ -248,7 +257,11 @@ export default function DailyBitcoin({
       if (!r.ok) throw new Error(d.error);
       setVote(choice);
       setMessage(d.message);
-      track("daily_vote", { item_id: current.id, method: choice });
+      track("daily_vote", {
+        item_id: current.id,
+        edition_date: current.date,
+        method: choice,
+      });
     } catch (e) {
       setMessage(e instanceof Error ? e.message : "Voting unavailable.");
     } finally {
@@ -261,7 +274,7 @@ export default function DailyBitcoin({
     try {
       await navigator.clipboard.writeText(url);
       setMessage("Edition link copied. Your BTC amount is not included.");
-      track("daily_share", { item_id: current.id });
+      track("daily_share", { item_id: current.id, edition_date: current.date });
     } catch {
       setMessage(`Share this edition: ${url}`);
     }
@@ -322,7 +335,10 @@ export default function DailyBitcoin({
                   target="_blank"
                   rel="noopener noreferrer"
                   onClick={() =>
-                    track("daily_merchant_click", { item_id: current.id })
+                    track("daily_merchant_click", {
+                      item_id: current.id,
+                      edition_date: current.date,
+                    })
                   }
                 >
                   See the actual listing <ArrowUpRight size={17} />

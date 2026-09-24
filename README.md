@@ -93,3 +93,26 @@ Confirmation is an explicit POST from the private email link; scanner GET reques
 New GA events: `newsletter_signup` (request accepted, **not** confirmed subscription), `daily_vote`, `daily_share`, `daily_merchant_click`. Parameters remain restricted to item IDs and action methods. Confirmation/delivery counts come from stored subscriber status and the delivery ledger; no email address or BTC amount goes to GA. Vote cookies are a lightweight one-browser-per-edition control, not a fraud-proof public poll; totals are not displayed.
 
 Check Netlify job logs after launch. Add reviewed products rather than repeating a failed listing, and monitor signup-to-confirmation, email-driven engaged visits, merchant clicks, unsubscribes and repeat visits. A manual first-week editorial review is recommended. Signup controls include a honeypot, consent, input length limits, and IP rate limiting; add a bot challenge and stronger distributed throttling if abuse grows.
+
+
+## Kit migration (prepared; activation pending account setup)
+
+The Kit adapter is opt-in through `NEWSLETTER_PROVIDER=kit`. Until configured, early-access records remain in Netlify and no Kit request is made. The Resend path remains available for rollback; do not use Kit's shared postal address with Resend.
+
+Complete setup in a dedicated Daily Bitcoin Kit account:
+
+1. Choose the Free plan. Verify the account and sender `team@whatsbitcoinsprice.com` (this must be a working mailbox/alias). Complete any Kit sending approval and domain authentication.
+2. In Kit Email settings use Kit's offered shared newsletter postal address, as described in https://help.kit.com/en/articles/2502494-alternatives-for-your-physical-address. It is only for newsletters through Kit.
+3. Create a Daily Bitcoin form. Enable its incentive/confirmation email and turn OFF automatic confirmation. Customize the confirmation email and redirect confirmed readers to `/daily`. This integration must not bypass double opt-in.
+4. Create tags `Daily Bitcoin - daily` and `Daily Bitcoin - weekly`. Create custom fields with exact keys `bitcoin_perspective`, `bitcoin_frequency`, and `bitcoin_preferences_url`.
+5. Select a Classic/HTML email template supported by Kit's broadcast API. Its footer must include Kit's unsubscribe link and configured address. Starting point templates are not supported by this API.
+6. Store server-only production variables: `KIT_API_KEY`, `KIT_FORM_ID`, `KIT_DAILY_TAG_ID`, `KIT_WEEKLY_TAG_ID`, `KIT_EMAIL_TEMPLATE_ID`, `KIT_FROM_EMAIL=team@whatsbitcoinsprice.com`, `NEWSLETTER_PROVIDER=kit`. Keep `NEWSLETTER_SEND_ENABLED=false`.
+7. Set `KIT_SETUP_VERIFIED=true` only after the form, fields, tags, sender and footer have been checked. This enables signup confirmation requests and migration of pending consented early-access signups. It also permits the nightly job to create **draft** broadcasts. Existing unsubscribed/suppressed records are never migrated.
+8. Test Sean's confirmation, private preference updates, both frequency tags, Kit unsubscribe, and a draft preview at 0.2/1/3 BTC. Verify the Liquid calculations and Kit-managed address/unsubscribe footer. Kit's state is authoritative when private preference links are opened; confirmation through a local token cannot activate a Kit subscriber.
+9. Set `NEWSLETTER_SEND_ENABLED=true` and redeploy only after the end-to-end test. The 13:00 UTC job schedules one daily broadcast, plus a weekly-tag broadcast on Sundays, five minutes later. Kit delivers only to eligible active subscribers. Previously created drafts stay drafts and need scheduling in Kit; toggling the flag does not resend them.
+
+Broadcasts preserve the site's dated price snapshot, include the real product photo, personalize the hypothetical BTC quantity using Kit custom fields, and use tagged newsletter links back to the daily edition. The site's preferences page updates Kit fields and replaces frequency tags. Kit handles bounces, complaints, email confirmation, and built-in unsubscribe; no Resend webhook is needed for Kit delivery.
+
+`kit-broadcasts/<date>/<frequency>` is a creation ledger claimed atomically before calling Kit. A timeout or uncertain failure is marked `needs_review`, preventing blind retries that could duplicate mail. Reconcile with the matching description in Kit before changing a ledger record. A missing template/tag causes a hard failure instead of targeting the entire account.
+
+See `docs/analytics.md` for the launch baseline, event funnels, owner-traffic exclusion and GA4 custom dimensions. `newsletter_signup` is a key event for accepted signup requests, **not** confirmed subscribers; Kit subscriber state and delivery/click reports measure the latter.
