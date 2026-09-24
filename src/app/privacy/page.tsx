@@ -42,7 +42,11 @@ export default function Privacy() {
         actions. Google Analytics may use cookies and process device and usage
         information. Browser privacy controls or analytics blockers can limit
         this collection. Custom events exclude calculator values, and the
-        configured page address excludes the sharing fragment.
+        configured page address excludes query strings and the sharing fragment.
+        We also measure whether a daily find or signup form was visible and
+        whether a signup request succeeded. To exclude this browser from
+        analytics, open the homepage with ?analytics=off; use ?analytics=on to
+        re-enable it.
       </p>
       <h2>External services</h2>
       <p>

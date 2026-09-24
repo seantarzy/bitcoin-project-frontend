@@ -1,4 +1,5 @@
 "use client";
+import { useTrackView } from "../Analytics/useTrackView";
 import ProductPhoto from "./ProductPhoto";
 import type { Edition } from "./DailyBitcoin";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -53,6 +54,21 @@ export default function PurchasingPower({
   initialData: MarketData;
   dailyEdition: Edition;
 }) {
+  const teaserRef = useTrackView<HTMLElement>(
+    "daily_teaser_view",
+    {
+      item_id: dailyEdition.id,
+      edition_date: dailyEdition.date,
+      placement: "homepage",
+    },
+    dailyEdition.date,
+  );
+  const calculatorRef = useTrackView<HTMLElement>("section_view", {
+    section: "calculator",
+  });
+  const comparisonsRef = useTrackView<HTMLElement>("section_view", {
+    section: "comparisons",
+  });
   const [market, setMarket] = useState(initialData);
   const [amount, setAmount] = useState("1");
   const [category, setCategory] = useState("Everything");
@@ -384,12 +400,16 @@ export default function PurchasingPower({
         </button>
       </header>
       <main>
-        <aside className="wrap daily-teaser-wrap">
+        <aside ref={teaserRef} className="wrap daily-teaser-wrap">
           <Link
             className="daily-teaser"
             href={`/daily?edition=${dailyEdition.date}`}
             onClick={() =>
-              track("daily_teaser_click", { item_id: dailyEdition.id })
+              track("daily_teaser_click", {
+                item_id: dailyEdition.id,
+                edition_date: dailyEdition.date,
+                placement: "homepage",
+              })
             }
           >
             <div className="daily-teaser-copy">
@@ -486,7 +506,11 @@ export default function PurchasingPower({
             </span>
           </div>
         </div>
-        <section className="calculator wrap" id="calculator">
+        <section
+          className="calculator wrap"
+          ref={calculatorRef}
+          id="calculator"
+        >
           <div className="section-kicker">01 / YOUR STARTING POINT</div>
           <div className="calculator-grid">
             <div>
@@ -549,7 +573,11 @@ export default function PurchasingPower({
             </p>
           )}
         </section>
-        <section className="possibilities wrap" id="possibilities">
+        <section
+          className="possibilities wrap"
+          ref={comparisonsRef}
+          id="possibilities"
+        >
           <div className="section-heading">
             <div>
               <div className="section-kicker">02 / THE POSSIBILITIES</div>

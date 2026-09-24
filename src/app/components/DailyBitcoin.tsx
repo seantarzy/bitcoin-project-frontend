@@ -1,6 +1,7 @@
 "use client";
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useState, useRef, type FormEvent } from "react";
 import Link from "next/link";
+import { useTrackView } from "../Analytics/useTrackView";
 import ProductPhoto from "./ProductPhoto";
 import { ArrowUpRight, Mail, ArrowRight, Check, Share2 } from "lucide-react";
 import { track } from "@/services/analytics";
@@ -25,6 +26,10 @@ const money = (n: number) =>
 const btcFormat = (n: number) =>
   n.toLocaleString("en-US", { maximumFractionDigits: 8 });
 export function NewsletterForm() {
+  const signupRef = useTrackView<HTMLElement>("newsletter_view", {
+    placement: "daily",
+  });
+  const started = useRef(false);
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
   const [sent, setSent] = useState(false);
@@ -37,6 +42,7 @@ export function NewsletterForm() {
   }, []);
   async function submit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    track("newsletter_submit", { placement: "daily" });
     setBusy(true);
     setMessage("");
     const data = new FormData(e.currentTarget);
@@ -56,15 +62,19 @@ export function NewsletterForm() {
       if (!r.ok) throw new Error(d.error);
       setMessage(d.message);
       setSent(true);
-      track("newsletter_signup");
+      track("newsletter_signup", {
+        placement: "daily",
+        outcome: enabled ? "confirmation_requested" : "early_access",
+      });
     } catch (e) {
+      track("newsletter_error", { placement: "daily" });
       setMessage(e instanceof Error ? e.message : "Please try again.");
     } finally {
       setBusy(false);
     }
   }
   return (
-    <section className="daily-signup" id="subscribe">
+    <section ref={signupRef} className="daily-signup" id="subscribe">
       <div>
         <span className="daily-eyebrow">
           <Mail size={15} /> THE DAILY BITCOIN
@@ -84,7 +94,15 @@ export function NewsletterForm() {
             : "Early access is open. Confirmations will arrive when email delivery launches."}
         </p>
       </div>
-      <form onSubmit={submit}>
+      <form
+        onSubmit={submit}
+        onFocus={() => {
+          if (!started.current) {
+            started.current = true;
+            track("newsletter_start", { placement: "daily" });
+          }
+        }}
+      >
         {sent ? (
           <div className="daily-success">
             <Check />
@@ -172,6 +190,13 @@ export default function DailyBitcoin({
     initialEdition ? [initialEdition] : [],
   );
   const [current, setCurrent] = useState<Edition | null>(initialEdition);
+  const editionRef = useTrackView<HTMLDivElement>(
+    "daily_view",
+    { item_id: current?.id, edition_date: current?.date },
+    current?.date || "none",
+  );
+  const amountTimer = useRef<ReturnType<typeof setTimeout>>();
+  useEffect(() => () => clearTimeout(amountTimer.current), []);
   const [amount, setAmount] = useState("1");
   const [message, setMessage] = useState("");
   const [vote, setVote] = useState("");
@@ -273,7 +298,7 @@ export default function DailyBitcoin({
               <span>THE FIND / {current.date}</span>
               <span>{archived ? "FROM THE ARCHIVE" : "PRICE CHECKED"}</span>
             </div>
-            <div className="daily-feature">
+            <div ref={editionRef} className="daily-feature">
               <div className="daily-illustration">
                 <ProductPhoto src={current.imageUrl} alt={current.title} />
                 <small>PRODUCT PHOTO · {current.merchant}</small>
@@ -314,7 +339,24 @@ export default function DailyBitcoin({
                   max="21000000"
                   step="0.00000001"
                   value={amount}
-                  onChange={(e) => setAmount(e.target.value)}
+                  onChange={(e) => {
+                    const raw = e.target.value;
+                    setAmount(raw);
+                    clearTimeout(amountTimer.current);
+                    if (
+                      /^\d+(\.\d{1,8})?$/.test(raw) &&
+                      Number(raw) > 0 &&
+                      Number(raw) <= 21000000
+                    )
+                      amountTimer.current = setTimeout(
+                        () =>
+                          track("daily_amount_changed", {
+                            item_id: current.id,
+                            edition_date: current.date,
+                          }),
+                        1000,
+                      );
+                  }}
                 />
               </label>
               <div>
@@ -400,6 +442,10 @@ export default function DailyBitcoin({
                 <button
                   key={e.date}
                   onClick={() => {
+                    track("daily_archive_opened", {
+                      item_id: e.id,
+                      edition_date: e.date,
+                    });
                     setCurrent(e);
                     setVote("");
                     setMessage("");

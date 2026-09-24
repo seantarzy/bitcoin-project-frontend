@@ -1,6 +1,5 @@
 import { getDailyEdition } from "@/services/daily";
 import DailyBitcoin from "../components/DailyBitcoin";
-import GoogleAnalytics from "../Analytics/GoogleAnalytics";
 export const revalidate = 60;
 export const metadata = {
   title: "The Daily Bitcoin · Real things. Bitcoin prices.",
@@ -17,7 +16,6 @@ export default async function DailyPage() {
   const edition = await getDailyEdition();
   return (
     <>
-      <GoogleAnalytics />
       <DailyBitcoin initialEdition={edition} />
     </>
   );
