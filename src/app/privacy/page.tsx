@@ -31,6 +31,17 @@ export default function Privacy() {
         sent to Google Analytics. Voting uses an anonymous browser cookie to
         update one vote per edition; clearing cookies can reset this identifier.
       </p>
+      <h2>Live Bitcoin game</h2>
+      <p>
+        The free game uses an anonymous, HTTP-only browser cookie lasting 30
+        days to associate your current round, streak, and personal best with
+        server records on Netlify. Clearing the cookie disconnects this browser
+        from those records. The live chart connects directly to Coinbase
+        Exchange, which receives ordinary connection information, including your
+        IP address. Game analytics measure entries, locked rounds, outcomes,
+        replays, and sharing actions; they do not include your target prices or
+        game cookie. Scores have no cash or token value.
+      </p>
       <h2>Sharing</h2>
       <p>
         Copying a comparison link includes the hypothetical amount, the selected

@@ -1,4 +1,11 @@
 export type EventName =
+  | "game_view"
+  | "game_round_locked"
+  | "game_round_result"
+  | "game_replay"
+  | "game_share"
+  | "game_newsletter_click"
+  | "game_entry"
   | "page_view"
   | "section_view"
   | "daily_teaser_view"

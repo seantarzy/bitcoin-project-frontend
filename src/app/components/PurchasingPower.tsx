@@ -385,6 +385,12 @@ export default function PurchasingPower({
           </span>
         </Link>
         <nav aria-label="Main navigation">
+          <Link
+            href="/play"
+            onClick={() => track("game_entry", { placement: "navigation" })}
+          >
+            Play live ↗
+          </Link>
           <Link href="/daily">The Daily Bitcoin</Link>
           <a href="#how-it-works">How it works</a>
           <Link href="/price" className="nav-price">
@@ -400,6 +406,21 @@ export default function PurchasingPower({
         </button>
       </header>
       <main>
+        <Link
+          href="/play"
+          onClick={() => track("game_entry", { placement: "homepage" })}
+          style={{
+            display: "block",
+            textAlign: "center",
+            background: "#c5ff5d",
+            color: "#152010",
+            padding: "14px 20px",
+            fontSize: 13,
+            fontWeight: 700,
+          }}
+        >
+          NEW · Catch Bitcoin’s next move. Play the free live game ↗
+        </Link>
         <aside ref={teaserRef} className="wrap daily-teaser-wrap">
           <Link
             className="daily-teaser"
