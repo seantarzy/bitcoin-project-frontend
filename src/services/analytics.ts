@@ -1,8 +1,10 @@
 export type EventName =
   | "game_view"
+  | "game_target_placed"
   | "game_round_locked"
   | "game_round_result"
   | "game_replay"
+  | "game_share_opened"
   | "game_share"
   | "game_newsletter_click"
   | "game_entry"

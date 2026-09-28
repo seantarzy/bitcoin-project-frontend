@@ -8,11 +8,11 @@ const history = () =>
     time: NOW - (120 - i) * 1000,
     price: 80000 + Math.sin(i / 4) * 10,
   }));
-test("volatility bands use past prices, tighten in pairs, and keep a floor", () => {
+test("volatility bands use past prices, tighten after every win, and keep a floor", () => {
   const easy = makeOffer(history(), 0, NOW),
     hard = makeOffer(history(), 8, NOW);
   assert.ok(easy.halfWidth > hard.halfWidth);
-  assert.equal(easy.halfWidth, makeOffer(history(), 1, NOW).halfWidth);
+  assert.ok(easy.halfWidth > makeOffer(history(), 1, NOW).halfWidth);
   assert.equal(
     makeOffer(
       history().map((t) => ({ ...t, price: 80000 })),
@@ -108,7 +108,7 @@ test("server locks once, resumes active rounds, settles once and ignores submitt
   r = await (
     await h.post({ action: "lock", id, center: 80000, streak: 999 })
   ).json();
-  assert.equal(r.round.endsAt, NOW + 12000);
+  assert.equal(r.round.endsAt, NOW + 6000);
   assert.equal(
     (await (await h.post({ action: "prepare" })).json()).round.id,
     id,
@@ -122,7 +122,7 @@ test("server locks once, resumes active rounds, settles once and ignores submitt
     (await (await h.post({ action: "settle", id })).json()).round.phase,
     "locked",
   );
-  h.advance(14000);
+  h.advance(8000);
   r = await (await h.post({ action: "settle", id, settledPrice: 0 })).json();
   assert.equal(r.streak, 1);
   assert.equal(r.best, 1);
@@ -188,4 +188,41 @@ test("settlement waits briefly for delayed REST coverage rather than voiding imm
       .outcome,
     "win",
   );
+});
+
+test("winning targets shrink even when volatility increases, while chart scale stays fixed", () => {
+  const first = makeOffer(history(), 0, NOW);
+  const wild = history().map((t) => ({
+    ...t,
+    price: 80000 + (t.price - 80000) * 20,
+  }));
+  const second = makeOffer(wild, 1, NOW, { ...first, outcome: "win" });
+  assert.ok(second.halfWidth <= first.halfWidth * 0.8);
+  assert.equal(second.chartHalfSpan, first.chartHalfSpan);
+  assert.equal(second.forecastMs, 5000);
+  assert.equal(second.bufferMs, 1000);
+  const refreshed = makeOffer(wild, 1, NOW, second);
+  assert.equal(refreshed.halfWidth, second.halfWidth);
+});
+
+test("five-second mode archives the legacy best and does not interrupt a locked round", async () => {
+  const h = harness();
+  await h.post({ action: "prepare" });
+  Object.assign(h.state(), { rulesVersion: 1, best: 9, streak: 4 });
+  const migrated = await (await h.post({ action: "prepare" })).json();
+  assert.equal(migrated.legacyBest, 9);
+  assert.equal(migrated.best, 0);
+  assert.equal(migrated.streak, 0);
+  assert.equal(migrated.rulesVersion, 2);
+  const other = harness();
+  const offer = await (await other.post({ action: "prepare" })).json();
+  await other.post({
+    action: "lock",
+    id: offer.round.id,
+    center: offer.round.anchor,
+  });
+  Object.assign(other.state(), { rulesVersion: 1, best: 9, streak: 4 });
+  const active = await (await other.post({ action: "prepare" })).json();
+  assert.equal(active.round.phase, "locked");
+  assert.equal(active.best, 9);
 });

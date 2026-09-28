@@ -10,6 +10,8 @@ import {
   Trophy,
 } from "lucide-react";
 import { track } from "@/services/analytics";
+import { chartSeries, DISPLAY_DELAY_MS } from "@/services/gameChart";
+import ScoreShare from "./ScoreShare";
 import "./game.css";
 type Tick = { time: number; price: number };
 type Round = {
@@ -17,6 +19,9 @@ type Round = {
   phase: "ready" | "locked" | "done";
   anchor: number;
   halfWidth: number;
+  chartHalfSpan?: number;
+  forecastMs?: number;
+  bufferMs?: number;
   expiresAt: number;
   startsAt?: number;
   endsAt?: number;
@@ -40,7 +45,11 @@ const usd = (v: number) =>
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   });
-export default function LiveGame() {
+export default function LiveGame({
+  challengeTarget = null,
+}: {
+  challengeTarget?: number | null;
+}) {
   const [run, setRun] = useState<Run | null>(null),
     [ticks, setTicks] = useState<Tick[]>([]),
     [center, setCenter] = useState(0);
@@ -48,13 +57,15 @@ export default function LiveGame() {
     [busy, setBusy] = useState(false),
     [error, setError] = useState(""),
     [connection, setConnection] = useState(false),
-    [shared, setShared] = useState("");
+    [shareScore, setShareScore] = useState<number | null>(null),
+    [aimed, setAimed] = useState(false);
   const [finish, setFinish] = useState<{ id: string; ticks: Tick[] } | null>(
     null,
   );
   const offset = useRef(0),
     pending = useRef(false),
     seen = useRef(""),
+    aimedRound = useRef(""),
     chart = useRef<SVGSVGElement>(null);
   const round = run?.round,
     locked = round?.phase === "locked",
@@ -63,13 +74,16 @@ export default function LiveGame() {
     offset.current = data.serverNow - Date.now();
     setNow(data.serverNow);
     setRun(data);
-    if (data.round.phase === "ready") setCenter(data.round.anchor);
+    if (data.round.phase === "ready") {
+      setCenter(data.round.anchor);
+      setAimed(false);
+    }
     if (data.history?.length) setTicks(data.history);
     if (data.round.phase === "done" && seen.current !== data.round.id) {
       seen.current = data.round.id;
       track("game_round_result", {
         outcome: data.round.outcome,
-        method: "live",
+        method: "live_5s",
       });
     }
   }, []);
@@ -90,7 +104,8 @@ export default function LiveGame() {
         if (!r.ok)
           throw new Error(data.error || "Game unavailable. Please retry.");
         apply(data);
-        if (action === "lock") track("game_round_locked", { method: "live" });
+        if (action === "lock")
+          track("game_round_locked", { method: "live_5s" });
       } catch (e) {
         setError(
           e instanceof Error
@@ -105,10 +120,20 @@ export default function LiveGame() {
     [apply],
   );
   useEffect(() => {
-    track("game_view", { method: "live" });
+    track("game_view", { method: "live_5s" });
     void request("prepare");
-    const timer = setInterval(() => setNow(Date.now() + offset.current), 100);
-    return () => clearInterval(timer);
+    let frame = 0,
+      lastFrame = 0;
+    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)");
+    function animate(time: number) {
+      if (time - lastFrame >= (reduced.matches ? 250 : 1000 / 60)) {
+        setNow(Date.now() + offset.current);
+        lastFrame = time;
+      }
+      frame = requestAnimationFrame(animate);
+    }
+    frame = requestAnimationFrame(animate);
+    return () => cancelAnimationFrame(frame);
   }, [request]);
   useEffect(() => {
     let ws: WebSocket,
@@ -169,19 +194,35 @@ export default function LiveGame() {
     fresh = connection && !!last && now - last.time < 5000;
   const anchor = round?.anchor || last?.price || 0,
     width = round?.halfWidth || 10;
-  const min = anchor - width * 4.6,
-    max = anchor + width * 4.6;
+  const span = round?.chartHalfSpan || width * 4.6;
+  const min = anchor - span,
+    max = anchor + span;
+  const targetReach = Math.max(0, span - width);
+  const displayTime = now - DISPLAY_DELAY_MS;
+  const forecastMs =
+    round?.forecastMs ??
+    (round?.endsAt && round?.startsAt ? round.endsAt - round.startsAt : 5000);
+  const bufferMs = round?.bufferMs ?? 1000;
   const y = (p: number) => 310 - ((p - min) / (max - min)) * 280;
-  const end = round?.endsAt && !ready ? round.endsAt : now + 12000;
-  const start = end - 45000,
-    x = (t: number) => 32 + ((t - start) / 45000) * 716;
+  const end =
+    round?.endsAt && !ready
+      ? round.endsAt
+      : displayTime + forecastMs + bufferMs;
+  const start = end - 25000,
+    x = (t: number) => 32 + ((t - start) / 25000) * 716;
   useEffect(() => {
     if (round?.phase === "done" && finish?.id !== round.id)
       setFinish({ id: round.id, ticks });
   }, [round, ticks, finish]);
-  const visible = (
-    round?.phase === "done" && finish?.id === round.id ? finish.ticks : ticks
-  ).filter((t) => t.time >= start && t.time <= end);
+  const visible = chartSeries(
+    round?.phase === "done" && finish?.id === round.id ? finish.ticks : ticks,
+    start,
+    Math.min(end, displayTime),
+  );
+  const displayPrice =
+    round?.phase === "done" && round.settledPrice !== undefined
+      ? round.settledPrice
+      : visible.at(-1)?.price;
   const path = visible
     .map(
       (t, i) =>
@@ -191,30 +232,34 @@ export default function LiveGame() {
   const selected = ready
     ? center
     : ((round?.low || 0) + (round?.high || 0)) / 2;
-  const remaining = Math.max(0, ((round?.endsAt || 0) - now) / 1000);
+  const remaining = Math.max(
+    0,
+    Math.min(forecastMs / 1000, ((round?.endsAt || 0) - displayTime) / 1000),
+  );
   const expired = ready && now > round.expiresAt;
+  function markAimed(method: "chart" | "slider") {
+    setAimed(true);
+    if (round && aimedRound.current !== round.id) {
+      aimedRound.current = round.id;
+      track("game_target_placed", { method });
+    }
+  }
   function drag(e: React.PointerEvent<SVGSVGElement>) {
     if (!ready || busy || expired) return;
+    markAimed("chart");
     const box = chart.current!.getBoundingClientRect();
     const pos = ((e.clientY - box.top) / box.height) * 350;
     const value = max - ((pos - 30) / 280) * (max - min);
     setCenter(
       Math.round(
-        Math.max(anchor - width * 3, Math.min(anchor + width * 3, value)) * 100,
+        Math.max(anchor - targetReach, Math.min(anchor + targetReach, value)) *
+          100,
       ) / 100,
     );
   }
-  async function share() {
-    const text = `I caught ${run?.best || 0} Bitcoin moves in a row. Can you beat my streak?`;
-    try {
-      await navigator.clipboard.writeText(
-        `${text} https://whatsbitcoinsprice.com/play?utm_source=player&utm_medium=share&utm_campaign=live_game`,
-      );
-      setShared("Challenge link copied");
-      track("game_share", { method: "copy" });
-    } catch {
-      setShared("Share this page: whatsbitcoinsprice.com/play");
-    }
+  function share() {
+    setShareScore(Math.min(run?.best || 0, 9999));
+    track("game_share_opened", { method: "score_card" });
   }
   const outcome = round?.outcome;
   return (
@@ -235,15 +280,28 @@ export default function LiveGame() {
           Catch the <br />
           <em>next move.</em>
         </h1>
-        <p>Ten seconds. One target. How long can you keep your streak alive?</p>
+        <p>
+          Five seconds. One target. How long can you keep your streak alive?
+        </p>
       </div>
+      {challengeTarget !== null && (
+        <div className="game-challenge" role="status">
+          <span>FRIEND CHALLENGE</span>
+          <strong>
+            {(run?.best || 0) > challengeTarget
+              ? "Challenge beaten. Set the next record."
+              : `Beat ${challengeTarget} ${challengeTarget === 1 ? "move" : "moves"} in a row.`}
+          </strong>
+          <small>Live markets change. Every run is its own challenge.</small>
+        </div>
+      )}
       <section className="game-arena" aria-label="Live Bitcoin prediction game">
         <div className="game-score">
           <span>
             <Flame size={20} /> STREAK <strong>{run?.streak || 0}</strong>
           </span>
           <span>
-            <Trophy size={18} /> BEST <strong>{run?.best || 0}</strong>
+            <Trophy size={18} /> 5s BEST <strong>{run?.best || 0}</strong>
           </span>
           <span className={fresh ? "feed-live" : "feed-wait"}>
             <i />
@@ -253,7 +311,14 @@ export default function LiveGame() {
         <div className="game-chart-head">
           <div>
             <small>BTC / USD · COINBASE</small>
-            <strong>{last ? usd(last.price) : "Connecting to Bitcoin…"}</strong>
+            <strong>
+              {displayPrice !== undefined
+                ? usd(displayPrice)
+                : "Connecting to Bitcoin…"}
+            </strong>
+            <span className="game-display-note">
+              Smoothed live feed · 0.8s visual delay
+            </span>
           </div>
           <div className="game-clock">
             {locked ? (
@@ -263,8 +328,8 @@ export default function LiveGame() {
                   <small>s</small>
                 </strong>
                 <span>
-                  {now < (round.startsAt || 0)
-                    ? "LOCK-IN BUFFER"
+                  {displayTime < (round.startsAt || 0)
+                    ? "LOCKING YOUR RANGE"
                     : remaining > 0
                       ? "FOLLOW THE PRICE"
                       : "VERIFYING RESULT"}
@@ -273,7 +338,13 @@ export default function LiveGame() {
             ) : (
               <>
                 <Crosshair size={25} />
-                <span>{ready ? "DRAG YOUR TARGET" : "YOUR NEXT MOVE"}</span>
+                <span>
+                  {ready
+                    ? aimed
+                      ? "TARGET PLACED"
+                      : "PLACE YOUR TARGET"
+                    : "YOUR NEXT MOVE"}
+                </span>
               </>
             )}
           </div>
@@ -325,7 +396,7 @@ export default function LiveGame() {
             </g>
           ))}
           <g clipPath="url(#plot-clip)">
-            {round && (
+            {round && (!ready || aimed) && (
               <>
                 <rect
                   x="28"
@@ -381,6 +452,37 @@ export default function LiveGame() {
               />
             )}
           </g>
+          {ready && !aimed && (
+            <g className="game-aim-hint">
+              <rect
+                x="220"
+                y="125"
+                width="360"
+                height="80"
+                rx="12"
+                fill="#101613"
+                opacity=".92"
+              />
+              <text
+                x="400"
+                y="159"
+                textAnchor="middle"
+                fill="#c5ff5d"
+                fontSize="18"
+              >
+                Tap the chart to place your target
+              </text>
+              <text
+                x="400"
+                y="185"
+                textAnchor="middle"
+                fill="#a4af9d"
+                fontSize="13"
+              >
+                or use the slider below
+              </text>
+            </g>
+          )}
           <text x="748" y="343" fill="#c5ff5d" textAnchor="end" fontSize="11">
             FINISH
           </text>
@@ -394,19 +496,42 @@ export default function LiveGame() {
               <label htmlFor="target">
                 Your landing zone{" "}
                 <strong>
-                  {usd(center - width)} – {usd(center + width)}
+                  {aimed
+                    ? `${usd(center - width)} – ${usd(center + width)}`
+                    : "Choose where Bitcoin will finish"}
                 </strong>
               </label>
               <input
                 id="target"
                 aria-label="Target price center"
                 type="range"
-                min={anchor - width * 3}
-                max={anchor + width * 3}
+                min={anchor - targetReach}
+                max={anchor + targetReach}
                 step="0.01"
                 value={center}
                 disabled={busy || expired}
-                onChange={(e) => setCenter(Number(e.target.value))}
+                onPointerDown={() => {
+                  if (!busy && !expired) markAimed("slider");
+                }}
+                onKeyDown={(e) => {
+                  if (
+                    [
+                      "ArrowLeft",
+                      "ArrowRight",
+                      "ArrowUp",
+                      "ArrowDown",
+                      "Home",
+                      "End",
+                      "PageUp",
+                      "PageDown",
+                    ].includes(e.key)
+                  )
+                    markAimed("slider");
+                }}
+                onChange={(e) => {
+                  setCenter(Number(e.target.value));
+                  markAimed("slider");
+                }}
               />
               <div className="target-hints">
                 <span>Lower</span>
@@ -415,7 +540,7 @@ export default function LiveGame() {
               </div>
               <button
                 className="game-primary"
-                disabled={busy || (!fresh && !expired)}
+                disabled={busy || ((!fresh || !aimed) && !expired)}
                 onClick={() =>
                   void request(expired ? "prepare" : "lock", round.id, center)
                 }
@@ -424,13 +549,15 @@ export default function LiveGame() {
                   ? "Locking…"
                   : expired
                     ? "Refresh target"
-                    : "Lock my prediction"}{" "}
+                    : !aimed
+                      ? "Place your target to play"
+                      : "Lock my prediction"}{" "}
                 <ArrowUpRight size={20} />
               </button>
               <p className="game-footnote">
                 {expired
                   ? "Your target expired. Refresh for current volatility."
-                  : `10-second forecast after a 2-second buffer · Target width ${usd(width * 2)}`}
+                  : `${forecastMs / 1000}-second round · ${bufferMs / 1000}s lock-in · Target width ${usd(width * 2)}`}
               </p>
             </>
           )}
@@ -438,9 +565,11 @@ export default function LiveGame() {
             <div className="game-watching">
               <span className="watch-dot" />
               <h2>
-                {remaining > 0
-                  ? "Prediction locked. Eyes on the line."
-                  : "Checking the official finish…"}
+                {displayTime < (round.startsAt || 0)
+                  ? "Locking your range…"
+                  : remaining > 0
+                    ? "Five seconds. Make them count."
+                    : "Checking the official finish…"}
               </h2>
               <p>
                 {usd(round.low!)} – {usd(round.high!)}
@@ -486,7 +615,7 @@ export default function LiveGame() {
               </button>
               <button className="game-share" onClick={share}>
                 <Share2 size={16} />
-                {shared || "Challenge a friend"}
+                Share score card · Challenge a friend
               </button>
             </div>
           )}
@@ -525,12 +654,12 @@ export default function LiveGame() {
         </div>
         <div>
           <span>02 / WATCH</span>
-          <p>Lock it. Follow ten seconds of real market movement.</p>
+          <p>Lock it. Follow five seconds of real market movement.</p>
         </div>
         <div>
           <span>03 / REPEAT</span>
           <p>
-            Catch the finish. Build your streak. Targets tighten every two wins.
+            Start wide. Catch the finish. Your target shrinks after every win.
           </p>
         </div>
       </div>
@@ -559,11 +688,15 @@ export default function LiveGame() {
         <summary>How pricing, timing, and fair play work</summary>
         <p>
           Reference market: Coinbase Exchange BTC/USD. Targets use recent
-          10-second price moves and stay fixed for the round. After the server
-          accepts your prediction, a 2-second buffer precedes the 10-second
-          forecast. The official finish is the time-weighted last-trade price
-          over the final second, calculated on the server—not the last dot on
-          your screen. Boundaries count as a hit.
+          5-second price moves and stay fixed for the round. Opening targets are
+          generous; each win shrinks the next target by at least 20%, down to a
+          $1 minimum width. After the server accepts your prediction, a 1-second
+          lock-in precedes the 5-second forecast. The chart uses an
+          800-millisecond visual buffer to interpolate received trades; it never
+          predicts future prices. Settlement timing is not delayed. The official
+          finish is the time-weighted last-trade price over the final second,
+          calculated on the server—not the last dot on your screen. Boundaries
+          count as a hit.
         </p>
         <p>
           Network delays can make the displayed chart differ from settlement.
@@ -574,6 +707,9 @@ export default function LiveGame() {
           or prizes are offered in this beta.
         </p>
       </details>
+      {shareScore !== null && (
+        <ScoreShare score={shareScore} onClose={() => setShareScore(null)} />
+      )}
     </main>
   );
 }

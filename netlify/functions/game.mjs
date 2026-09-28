@@ -51,6 +51,13 @@ export const createGame =
       };
       if (body.action === "prepare") {
         if (run.round?.phase === "locked") return reply(run);
+        if (run.rulesVersion !== 2) {
+          run.legacyBest = Math.max(run.legacyBest || 0, run.best || 0);
+          run.streak = 0;
+          run.best = 0;
+          run.round = null;
+          run.rulesVersion = 2;
+        }
         const trades = await getTrades(),
           now = clock();
         if (
@@ -61,7 +68,7 @@ export const createGame =
           run.round = {
             id: randomBytes(16).toString("hex"),
             phase: "ready",
-            ...makeOffer(trades, run.streak, now),
+            ...makeOffer(trades, run.streak, now, run.round),
           };
           await commit();
         }
@@ -87,7 +94,11 @@ export const createGame =
           );
         if (
           !Number.isFinite(body.center) ||
-          Math.abs(body.center - r.anchor) > r.halfWidth * 3
+          Math.abs(body.center - r.anchor) >
+            (r.chartHalfSpan
+              ? r.chartHalfSpan - r.halfWidth
+              : r.halfWidth * 3) +
+              0.000001
         )
           return reply({ error: "Choose a target inside the chart." }, 400);
         run.round = {
@@ -95,8 +106,9 @@ export const createGame =
           phase: "locked",
           low: body.center - r.halfWidth,
           high: body.center + r.halfWidth,
-          startsAt: now + BUFFER_MS,
-          endsAt: now + BUFFER_MS + FORECAST_MS,
+          startsAt: now + (r.bufferMs ?? BUFFER_MS),
+          endsAt:
+            now + (r.bufferMs ?? BUFFER_MS) + (r.forecastMs ?? FORECAST_MS),
         };
         await commit();
         return reply(run);

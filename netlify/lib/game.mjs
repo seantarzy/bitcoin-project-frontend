@@ -1,5 +1,5 @@
-export const FORECAST_MS = 10000;
-export const BUFFER_MS = 2000;
+export const FORECAST_MS = 5000;
+export const BUFFER_MS = 1000;
 export function cleanTrades(raw) {
   if (!Array.isArray(raw)) throw new Error("Market unavailable");
   return raw
@@ -9,7 +9,7 @@ export function cleanTrades(raw) {
     )
     .sort((a, b) => a.time - b.time);
 }
-export function makeOffer(trades, streak, now) {
+export function makeOffer(trades, streak, now, previous) {
   const last = trades.at(-1);
   if (!last || now - last.time > 5000 || last.time > now + 2000)
     throw new Error("Market feed is delayed. Try again shortly.");
@@ -19,21 +19,39 @@ export function makeOffer(trades, streak, now) {
   const moves = [];
   for (let i = 0; i < recent.length; i++) {
     const before = recent.find((t) => t.time >= recent[i].time - FORECAST_MS);
-    if (before && recent[i].time - before.time >= 8000)
+    if (before && recent[i].time - before.time >= 4000)
       moves.push(Math.abs(recent[i].price - before.price));
   }
   moves.sort((a, b) => a - b);
   if (!moves.length)
     throw new Error("Market is warming up. Try again shortly.");
   const typical = moves[Math.floor(moves.length * 0.7)];
-  const halfWidth =
+  let halfWidth =
     Math.round(
-      Math.max(
-        0.5,
-        typical * 1.3 * Math.max(0.4, Math.pow(0.88, Math.floor(streak / 2))),
-      ) * 100,
+      Math.max(0.5, typical * 2.8 * Math.max(0.08, Math.pow(0.8, streak))) *
+        100,
     ) / 100;
-  return { anchor: last.price, halfWidth, expiresAt: now + 30000 };
+  // A winning run must visibly get harder even if market volatility rises.
+  if (streak > 0 && previous?.halfWidth) {
+    const cap =
+      previous.outcome === "win"
+        ? previous.halfWidth * 0.8
+        : previous.halfWidth;
+    halfWidth = Math.max(0.5, Math.min(halfWidth, Math.floor(cap * 100) / 100));
+  }
+  const chartHalfSpan =
+    streak > 0 && previous?.chartHalfSpan
+      ? previous.chartHalfSpan
+      : Math.ceil(Math.max(halfWidth * 2.2, 2) * 100) / 100;
+  return {
+    anchor: last.price,
+    halfWidth,
+    chartHalfSpan,
+    forecastMs: FORECAST_MS,
+    bufferMs: BUFFER_MS,
+    expiresAt: now + 30000,
+    rulesVersion: 2,
+  };
 }
 export function settlement(trades, round, now) {
   if (now < round.endsAt + 1500) return null;
