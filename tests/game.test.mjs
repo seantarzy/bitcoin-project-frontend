@@ -13,19 +13,19 @@ const history = () =>
     time: NOW - (120 - i) * 1000,
     price: 80000 + Math.sin(i / 4) * 10,
   }));
-test("free-win zone stays at one cent at every streak", () => {
+test("next-move offers have no flat zone at any streak", () => {
   const easy = makeOffer(history(), 0, NOW),
     hard = makeOffer(history(), 8, NOW);
   assert.equal(easy.flatHalfWidth, hard.flatHalfWidth);
-  assert.equal(easy.rulesVersion, 4);
-  assert.equal(easy.flatHalfWidth, 0.01);
+  assert.equal(easy.rulesVersion, 5);
+  assert.equal(easy.flatHalfWidth, 0);
   assert.equal(
     makeOffer(
       history().map((t) => ({ ...t, price: 80000 })),
       100,
       NOW,
     ).flatHalfWidth,
-    0.01,
+    0,
   );
   assert.throws(() => makeOffer(history(), 0, NOW + 10000), /delayed/);
   assert.throws(() => makeOffer(history().slice(-2), 0, NOW), /history/);
@@ -71,18 +71,14 @@ function harness() {
       return { modified: true };
     },
   };
+  let recorded = history();
   const handler = createGame({
     getStore: () => db,
     clock: () => now,
     getTrades: async () => {
       calls++;
-      return now === NOW
-        ? history()
-        : [
-            { time: now - 5000, price: 80000 },
-            { time: now - 2000, price: 80000 },
-            { time: now, price: 80000 },
-          ];
+      if (now !== NOW) recorded = [...recorded, { time: now, price: 80000 }];
+      return recorded;
     },
   });
   const post = (body, origin = "https://example.com") =>
@@ -124,7 +120,7 @@ test("server locks once, resumes active rounds, settles once and ignores submitt
       streak: 999,
     })
   ).json();
-  assert.equal(r.round.endsAt, NOW + 6000);
+  assert.equal(r.round.endsAt, NOW + 10000);
   assert.equal(
     (await (await h.post({ action: "prepare" })).json()).round.id,
     id,
@@ -139,6 +135,8 @@ test("server locks once, resumes active rounds, settles once and ignores submitt
     "locked",
   );
   h.advance(8000);
+  await h.post({ action: "settle", id });
+  h.advance(1000);
   r = await (await h.post({ action: "settle", id, settledPrice: 0 })).json();
   assert.equal(r.streak, 1);
   assert.equal(r.best, 1);
@@ -272,7 +270,7 @@ test("direction mode archives old scores and locked rounds before starting fresh
   assert.equal(migrated.legacyBest, 9);
   assert.equal(migrated.best, 0);
   assert.equal(migrated.streak, 0);
-  assert.equal(migrated.rulesVersion, 4);
+  assert.equal(migrated.rulesVersion, 5);
   const other = harness();
   const offer = await (await other.post({ action: "prepare" })).json();
   await other.post({
@@ -288,23 +286,23 @@ test("direction mode archives old scores and locked rounds before starting fresh
   assert.equal(active.legacyBests[1], 9);
 });
 
-test("flat finish increments either server streak exactly once", async () => {
+test("unchanged market draws without adding or removing streak points", async () => {
   for (const direction of ["up", "down"]) {
     const h = harness();
     const offer = await (await h.post({ action: "prepare" })).json();
     h.advance(1000);
     await h.post({ action: "lock", id: offer.round.id, direction });
-    h.advance(8000);
+    h.state().streak = 2;
+    h.advance(12000);
     const result = await (
       await h.post({ action: "settle", id: offer.round.id })
     ).json();
-    assert.equal(result.round.actualDirection, "flat");
-    assert.equal(result.round.outcome, "win");
-    assert.equal(result.streak, 1);
+    assert.equal(result.round.outcome, "draw");
+    assert.equal(result.streak, 2);
     const again = await (
       await h.post({ action: "settle", id: offer.round.id })
     ).json();
-    assert.equal(again.streak, 1);
+    assert.equal(again.streak, 2);
   }
 });
 
@@ -325,6 +323,70 @@ test("already-issued version 3 rounds retain their original flat rules", () => {
   );
   assert.equal(
     settlement(trades, { ...round, direction: "flat" }, NOW + 2000).outcome,
+    "win",
+  );
+});
+
+test("next move skips equal ticks, ignores pre-lock changes and resolves first cent change", () => {
+  const r = {
+    rulesVersion: 5,
+    anchor: 100,
+    anchorTime: NOW - 100,
+    anchorTradeId: 10,
+    startsAt: NOW,
+    endsAt: NOW + 10000,
+    direction: "up",
+  };
+  const trades = [
+    { id: 10, time: NOW - 100, price: 100 },
+    { id: 11, time: NOW, price: 101 },
+    { id: 12, time: NOW + 100, price: 101 },
+    { id: 13, time: NOW + 200, price: 101.01 },
+    { id: 14, time: NOW + 300, price: 99 },
+  ];
+  assert.equal(settlement(trades, r, NOW + 900), null);
+  const result = settlement(trades, r, NOW + 1100);
+  assert.equal(result.outcome, "win");
+  assert.equal(result.anchor, 101);
+  assert.equal(result.settledPrice, 101.01);
+  assert.equal(result.resolvedAt, NOW + 200);
+  assert.equal(
+    settlement(trades, { ...r, direction: "down" }, NOW + 1100).outcome,
+    "miss",
+  );
+  assert.equal(
+    settlement(
+      trades.filter((t) => t.id !== 12),
+      r,
+      NOW + 1100,
+    ).outcome,
+    "void",
+  );
+  assert.equal(settlement(trades.slice(1), r, NOW + 1100).outcome, "void");
+});
+test("no-move draw requires deadline coverage and ignores moves after deadline", () => {
+  const r = {
+    rulesVersion: 5,
+    anchor: 100,
+    anchorTime: NOW,
+    startsAt: NOW,
+    endsAt: NOW + 10000,
+    direction: "up",
+  };
+  const trades = [
+    { time: NOW, price: 100 },
+    { time: NOW + 100, price: 100 },
+  ];
+  assert.equal(settlement(trades, r, NOW + 11000), null);
+  assert.equal(settlement(trades, r, NOW + 19000).outcome, "void");
+  assert.equal(
+    settlement([...trades, { time: NOW + 10001, price: 101 }], r, NOW + 11000)
+      .outcome,
+    "draw",
+  );
+  assert.equal(
+    settlement([...trades, { time: NOW + 10000, price: 101 }], r, NOW + 11000)
+      .outcome,
     "win",
   );
 });

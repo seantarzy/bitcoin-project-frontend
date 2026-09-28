@@ -28,7 +28,7 @@ export async function GET(request: Request) {
         }}
       >
         <span>BITCOIN / IN REAL LIFE</span>
-        <span>UP / DOWN · FLAT = FREE WIN</span>
+        <span>UP / DOWN · THE NEXT MOVE</span>
       </div>
       <div style={{ display: "flex", alignItems: "center", gap: 45 }}>
         <span

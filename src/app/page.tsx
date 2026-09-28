@@ -5,11 +5,11 @@ import PurchasingPower from "./components/PurchasingPower";
 export const metadata: Metadata = {
   title: "Catch the next move · Play live Bitcoin",
   description:
-    "Up or Down? Play the free five-second Bitcoin game, build your streak, then explore the daily find and what Bitcoin can buy.",
+    "Up or Down? Play the free next-move Bitcoin game, build your streak, then explore the daily find and what Bitcoin can buy.",
   openGraph: {
     title: "Catch the next move · Play live Bitcoin",
     description:
-      "Call Bitcoin’s next five seconds. Play free, build a streak, and challenge a friend.",
+      "Call Bitcoin’s next move. Play free, build a streak, and challenge a friend.",
     images: [{ url: "/play/card?score=0", width: 1200, height: 630 }],
   },
   twitter: {

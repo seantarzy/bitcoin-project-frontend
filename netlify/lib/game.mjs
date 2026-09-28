@@ -1,13 +1,17 @@
-export const FORECAST_MS = 5000;
-export const BUFFER_MS = 1000;
+export const FORECAST_MS = 10000;
+export const BUFFER_MS = 0;
 export function cleanTrades(raw) {
   if (!Array.isArray(raw)) throw new Error("Market unavailable");
   return raw
-    .map((t) => ({ time: Date.parse(t.time), price: Number(t.price) }))
+    .map((t) => ({
+      time: Date.parse(t.time),
+      price: Number(t.price),
+      ...(Number.isSafeInteger(t.trade_id) ? { id: t.trade_id } : {}),
+    }))
     .filter(
       (t) => Number.isFinite(t.time) && Number.isFinite(t.price) && t.price > 0,
     )
-    .sort((a, b) => a.time - b.time);
+    .sort((a, b) => a.time - b.time || (a.id || 0) - (b.id || 0));
 }
 export function makeOffer(trades, streak, now) {
   const last = trades.at(-1);
@@ -26,7 +30,7 @@ export function makeOffer(trades, streak, now) {
   if (!moves.length)
     throw new Error("Market is warming up. Try again shortly.");
   const typical = moves[Math.floor(moves.length * 0.7)];
-  const flatHalfWidth = 0.01;
+  const flatHalfWidth = 0;
   return {
     anchor: last.price,
     flatHalfWidth,
@@ -34,10 +38,11 @@ export function makeOffer(trades, streak, now) {
     forecastMs: FORECAST_MS,
     bufferMs: BUFFER_MS,
     expiresAt: now + 30000,
-    rulesVersion: 4,
+    rulesVersion: 5,
   };
 }
 export function settlement(trades, round, now) {
+  if (round.rulesVersion === 5) return nextMoveSettlement(trades, round, now);
   if (now < round.endsAt + 1500) return null;
   if (now > round.endsAt + 60000)
     return {
@@ -109,4 +114,61 @@ export function directionAt(price, anchor, flatHalfWidth) {
   const low = Math.round((anchor - flatHalfWidth) * 100);
   const high = Math.round((anchor + flatHalfWidth) * 100);
   return cents > high ? "up" : cents < low ? "down" : "flat";
+}
+
+export function nextMoveSettlement(trades, round, now) {
+  const voidResult = {
+    outcome: "void",
+    reason: "Market data could not be verified. Your streak is safe.",
+  };
+  if (now > round.endsAt + 60000)
+    return {
+      outcome: "miss",
+      reason: "Round expired before verification. Start a fresh streak.",
+    };
+  const anchorIndex = trades.findIndex((t) =>
+    round.anchorTradeId !== undefined
+      ? t.id === round.anchorTradeId
+      : t.time === round.anchorTime && t.price === round.anchor,
+  );
+  if (anchorIndex < 0) return voidResult;
+  const covered = trades.slice(anchorIndex);
+  for (let i = 1; i < covered.length; i++) {
+    if (
+      covered[i].id !== undefined &&
+      covered[i - 1].id !== undefined &&
+      covered[i].id !== covered[i - 1].id + 1
+    )
+      return voidResult;
+  }
+  const baseline = covered.filter((t) => t.time <= round.startsAt).at(-1);
+  if (!baseline) return voidResult;
+  const move = covered.find(
+    (t) =>
+      t.time > round.startsAt &&
+      t.time <= round.endsAt &&
+      Math.round(t.price * 100) !== Math.round(baseline.price * 100),
+  );
+  if (move) {
+    // Let the buffered chart reach the deciding trade before revealing its result.
+    if (now < move.time + 800) return null;
+    const actualDirection = move.price > baseline.price ? "up" : "down";
+    return {
+      outcome: actualDirection === round.direction ? "win" : "miss",
+      actualDirection,
+      anchor: baseline.price,
+      settledPrice: move.price,
+      resolvedAt: move.time,
+    };
+  }
+  if (now < round.endsAt + 800) return null;
+  if (!covered.some((t) => t.time >= round.endsAt))
+    return now < round.endsAt + 8000 ? null : voidResult;
+  return {
+    outcome: "draw",
+    anchor: baseline.price,
+    settledPrice: baseline.price,
+    resolvedAt: round.endsAt,
+    reason: "No price change in 10 seconds. Draw—your streak stays safe.",
+  };
 }

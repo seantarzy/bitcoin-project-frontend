@@ -50,7 +50,7 @@ export const createGame =
           throw new Error("Another tab updated this game. Reload to resume.");
       };
       if (body.action === "prepare") {
-        if (run.rulesVersion !== 4) {
+        if (run.rulesVersion !== 5) {
           run.legacyBests = {
             ...run.legacyBests,
             [run.rulesVersion || 1]: run.best || 0,
@@ -60,7 +60,7 @@ export const createGame =
           run.streak = 0;
           run.best = 0;
           run.round = null;
-          run.rulesVersion = 4;
+          run.rulesVersion = 5;
         }
         if (run.round?.phase === "locked") return reply(run);
         const trades = await getTrades(),
@@ -91,7 +91,7 @@ export const createGame =
         if (run.round.phase === "locked" || run.round.phase === "done")
           return reply(run);
         const r = run.round;
-        if (r.rulesVersion !== 4)
+        if (r.rulesVersion !== 5)
           return reply(
             { error: "The game has changed. Reload to play Up or Down." },
             409,
@@ -100,9 +100,9 @@ export const createGame =
           return reply({ error: "Round expired. Refresh to play." }, 409);
         if (!["up", "down"].includes(body.direction))
           return reply({ error: "Choose Up or Down." }, 400);
+        const now = clock();
         const trades = await getTrades();
-        const now = clock(),
-          latest = trades.at(-1);
+        const latest = trades.filter((t) => t.time <= now).at(-1);
         if (!latest || now - latest.time > 5000 || latest.time > now + 2000)
           return reply(
             { error: "Market feed is delayed. Please try again." },
@@ -113,6 +113,8 @@ export const createGame =
           phase: "locked",
           direction: body.direction,
           anchor: latest.price,
+          anchorTime: latest.time,
+          ...(latest.id !== undefined ? { anchorTradeId: latest.id } : {}),
           low: latest.price - r.flatHalfWidth,
           high: latest.price + r.flatHalfWidth,
           startsAt: now + BUFFER_MS,
@@ -124,7 +126,13 @@ export const createGame =
       if (run.round.phase === "done") return reply(run);
       if (run.round.phase !== "locked")
         return reply({ error: "Lock a prediction first." }, 400);
-      if (clock() < run.round.endsAt + 1500) return reply(run);
+      if (
+        clock() <
+        (run.round.rulesVersion === 5
+          ? run.round.startsAt + 800
+          : run.round.endsAt + 1500)
+      )
+        return reply(run);
       let result;
       try {
         result =

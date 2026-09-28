@@ -2,19 +2,19 @@
 
 `/play` is a free, non-prize BTC/USD prediction game. Reference feed: Coinbase Exchange ticker WebSocket in the browser, public trades REST endpoint for authoritative server decisions.
 
-## Round rules (Up / Down with flat freebies / version 4)
+## Round rules (next move / version 5)
 
-- Prepare: estimate the 70th percentile absolute 5-second move over up to 2 minutes of recent trades. The chart span adapts to that move. The flat free-win half-width is always $0.01, independent of volatility or streak. Offers expire in 30 seconds.
-- Before choosing, shaded Up/Down zones follow the buffered display price. Hover highlights a zone; clicking it or its accessible button locks immediately.
-- Lock: fetch a fresh server trade to set the official anchor, then record the direction and a deadline 6 seconds after acceptance (1-second animation buffer, 5-second forecast). The anchor can differ from the delayed display preview. Clients cannot submit prices or scores.
-- Settle: time-weighted last-trade price in the final second, compared in integer cents. Flat owns both cent boundaries and awards a win to either choice. Outside that zone, only the correct direction wins. Flat cannot be selected. Requires history on both sides of the window. Missing coverage or a feed gap over five seconds at the window boundaries voids the round. Settlement over 60 seconds late ends the streak.
-- A correct call increments the streak; a miss resets it; a void preserves it. Only the server changes streak and best. One outstanding round per anonymous browser cookie. Conditional blob writes prevent competing tabs from advancing a run twice. Repeated settle/lock is idempotent.
+- Prepare: offer a chart scaled from recent volatility, valid for 30 seconds. No flat zone or progressively harder rules.
+- Lock: accept only Up or Down; record the server timestamp before fetching fresh market history. Store the latest trade at or before that timestamp, including its exchange trade ID. No animation buffer shifts the cutoff.
+- Settle: poll after 800ms. Ignore trades at or before the lock timestamp and trades at the unchanged cent price. The first changed price within 10 seconds wins or loses the call. Recover the last price at/before the cutoff from complete exchange history to account for late-arriving trades. Wait until the deciding trade is at least 800ms old to align with the smoothed chart.
+- Require the saved anchor trade and contiguous exchange trade IDs in retrieved history. Missing coverage voids the round. No change by 10 seconds is a draw only after trades cover the deadline; allow up to 8 additional seconds for feed verification. A draw preserves streak without adding points. More than 60 seconds late ends the streak.
+- Only the server changes scores. One active round per cookie; conditional writes and idempotent settlement prevent double awards. Previous mode scores are archived separately on preparation.
 
 ## Animation and sharing
 
-The display runs on requestAnimationFrame with an 800ms buffer, interpolating only between received trades (no extrapolation, no bridging gaps over 2 seconds). Reduced-motion users get a slower visual refresh. Server settlement timing is unchanged by the display buffer. The official final-second average may differ from the last displayed tick.
+The display runs on requestAnimationFrame with an 800ms buffer, interpolating only between received trades (no extrapolation, no bridging gaps over 2 seconds). Reduced-motion users get a slower visual refresh. Server settlement timing is unchanged by the display buffer. The chart stops at the deciding trade; the server records its exact price and time.
 
-The score-card dialog offers PNG download, native sharing where supported, and a copyable emoji challenge. `/play/card?score=N` renders a bounded integer on the card. `/play?beat=N` displays the friend challenge and sets matching social metadata. Shared scores are claims for friendly play, not signed leaderboard records. v4 starts a separate direction streak/best on preparation, archiving old bests and any old locked round.
+The score-card dialog offers PNG download, native sharing where supported, and a copyable emoji challenge. `/play/card?score=N` renders a bounded integer on the card. `/play?beat=N` displays the friend challenge and sets matching social metadata. Shared scores are claims for friendly play, not signed leaderboard records. v5 starts a separate direction streak/best on preparation, archiving old bests and any old locked round.
 
 ## Limits
 
@@ -24,8 +24,8 @@ Anonymous game cookie lasts 30 days. Current run replaces the previous one at `g
 
 ## Measurement
 
-`game_entry` (homepage/navigation), `game_view`, `game_round_locked`, `game_round_result` (win/miss/void), `game_replay`, `game_share_opened`, `game_share` (copy/download/native), `game_newsletter_click`. View/lock/result events use method=direction_freebie_5s; lock/result category identifies the chosen direction to distinguish the new mode. Event parameters exclude target values and cookie IDs. Track unique players, first completion, replay, shared-link acquisition, and next-day returns. Owner/preview exclusions remain active. These events measure behavior, not prize eligibility.
+`game_entry` (homepage/navigation), `game_view`, `game_round_locked`, `game_round_result` (win/miss/draw/void), `game_replay`, `game_share_opened`, `game_share` (copy/download/native), `game_newsletter_click`. View/lock/result events use method=next_move; lock/result category identifies the chosen direction to distinguish the new mode. Event parameters exclude target values and cookie IDs. Track unique players, first completion, replay, shared-link acquisition, and next-day returns. Owner/preview exclusions remain active. These events measure behavior, not prize eligibility.
 
 ## Validation
 
-`npm test` includes deterministic settlement, flat free wins for either choice, cent boundaries, fresh lock anchors, stale data, invalid directions, early/repeated settlement, tampered input, expired offers, origin validation, and concurrent-write rejection. Run the site through `netlify dev` to test both UI and function; Next.js alone does not serve the function.
+`npm test` includes deterministic settlement, first-change ordering, deadline draws, missing trade sequences, cent boundaries, fresh lock anchors, stale data, invalid directions, early/repeated settlement, tampered input, expired offers, origin validation, and concurrent-write rejection. Run the site through `netlify dev` to test both UI and function; Next.js alone does not serve the function.

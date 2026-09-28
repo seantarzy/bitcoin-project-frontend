@@ -27,9 +27,10 @@ type Round = {
   expiresAt: number;
   startsAt?: number;
   endsAt?: number;
+  resolvedAt?: number;
   direction?: Direction;
   actualDirection?: Direction | "flat";
-  outcome?: "win" | "miss" | "void";
+  outcome?: "win" | "miss" | "void" | "draw";
   settledPrice?: number;
   reason?: string;
 };
@@ -87,7 +88,7 @@ export default function LiveGame({
     if (data.round.phase === "done" && seen.current !== data.round.id) {
       seen.current = data.round.id;
       track("game_round_result", {
-        method: "direction_freebie_5s",
+        method: "next_move",
         outcome: data.round.outcome,
         category: data.round.direction,
       });
@@ -112,7 +113,7 @@ export default function LiveGame({
         apply(data);
         if (action === "lock")
           track("game_round_locked", {
-            method: "direction_freebie_5s",
+            method: "next_move",
             category: direction,
           });
       } catch (e) {
@@ -128,7 +129,7 @@ export default function LiveGame({
   );
   useEffect(() => {
     track("game_view", {
-      method: "direction_freebie_5s",
+      method: "next_move",
       placement: embedded ? "homepage" : "play",
     });
     void request("prepare");
@@ -196,7 +197,7 @@ export default function LiveGame({
       ws?.close();
     };
   }, []);
-  const due = locked && now >= (round.endsAt || 0) + 1600;
+  const due = locked && now >= (round.startsAt || 0) + 800;
   useEffect(() => {
     if (!due || error || busy) return;
     const timer = setTimeout(() => void request("settle", round?.id), 500);
@@ -207,7 +208,10 @@ export default function LiveGame({
       setFinish({ id: round.id, ticks });
   }, [round, ticks, finish]);
   const displayTime = now - DISPLAY_DELAY_MS;
-  const end = round?.endsAt && !ready ? round.endsAt : displayTime + 6000,
+  const end =
+      round?.endsAt && !ready
+        ? round.resolvedAt || Math.min(round.endsAt, displayTime + 2000)
+        : displayTime + 2000,
     start = end - 25000;
   const visible = chartSeries(
     round?.phase === "done" && finish?.id === round.id ? finish.ticks : ticks,
@@ -222,7 +226,7 @@ export default function LiveGame({
     ? (displayPrice ?? round.anchor)
     : round?.anchor || displayPrice || 0;
   const span = round?.chartHalfSpan || 20,
-    flat = round?.flatHalfWidth || 0.01;
+    flat = round?.flatHalfWidth ?? 0;
   const axisCenter = ready
     ? Math.max(
         reference - span * 0.5,
@@ -247,7 +251,7 @@ export default function LiveGame({
     canChoose = ready && !expired && !busy && fresh;
   const remaining = Math.max(
     0,
-    Math.min(5, ((round?.endsAt || 0) - displayTime) / 1000),
+    Math.min(10, ((round?.endsAt || 0) - displayTime) / 1000),
   );
   const locking = locked && displayTime < (round.startsAt || 0);
   const selected = ready ? hover : round?.direction;
@@ -291,7 +295,7 @@ export default function LiveGame({
           Catch the <br />
           <em>next move.</em>
         </h1>
-        <p>Up or down? Call Bitcoin’s next five seconds.</p>
+        <p>Up or down? Which way is Bitcoin’s next move?</p>
       </div>
       {challengeTarget !== null && (
         <div className="game-challenge" role="status">
@@ -469,15 +473,15 @@ export default function LiveGame({
             {locked ? "FINISH" : "CHOOSE A ZONE"}
           </text>
           <text x="28" y="343" fill="#9baa93" fontSize="11">
-            FLAT ±{usd(flat)} = FREE WIN
+            UNCHANGED TICKS DON’T COUNT
           </text>
         </svg>
         <div className="game-controls">
           {ready && (
             <>
               <div className="direction-question">
-                <h2>Where will it finish?</h2>
-                <p>Pick Up or Down. Flat gives either choice a free win.</p>
+                <h2>Which way is the next move?</h2>
+                <p>Pick Up or Down. The first price change decides.</p>
               </div>
               <div className="direction-options">
                 {(["up", "down"] as Direction[]).map((direction) => (
@@ -517,7 +521,7 @@ export default function LiveGame({
                 <p className="game-footnote">
                   {busy
                     ? "Locking your call and checking the start price…"
-                    : "One tap locks your call · 1s lock-in + 5s forecast"}
+                    : "One tap locks your call · Up to 10s for a move"}
                 </p>
               )}
               <p className="direction-start-note">
@@ -537,10 +541,9 @@ export default function LiveGame({
                     : "Checking the official finish…"}
               </h2>
               <p>
-                Start: <strong>{usd(round.anchor)}</strong> · Free-win zone:{" "}
-                {usd(round.anchor - flat)} – {usd(round.anchor + flat)}
+                Start: <strong>{usd(round.anchor)}</strong>
                 <br />
-                Your start price stays fixed until the round ends.
+                Unchanged trades are skipped. No move in 10s is a draw.
               </p>
             </div>
           )}
@@ -548,12 +551,12 @@ export default function LiveGame({
             <div className={`game-result result-${outcome}`} aria-live="polite">
               <span className="result-label">
                 {outcome === "win"
-                  ? round.actualDirection === "flat"
-                    ? "FLAT FINISH · FREE WIN"
-                    : "CALLED IT"
+                  ? "CALLED IT"
                   : outcome === "miss"
                     ? "WRONG WAY"
-                    : "ROUND VOIDED"}
+                    : outcome === "draw"
+                      ? "NO MOVE · DRAW"
+                      : "ROUND VOIDED"}
               </span>
               <h2>
                 {outcome === "win"
@@ -564,9 +567,7 @@ export default function LiveGame({
               </h2>
               <p>
                 {round.reason ||
-                  (round.actualDirection === "flat"
-                    ? "Bitcoin finished flat. Free win—your streak grows!"
-                    : `You called ${labels[round.direction!]}. It finished ${labels[round.actualDirection!]}.`)}
+                  `You called ${labels[round.direction!]}. The next move was ${labels[round.actualDirection!]}.`}
                 <br />
                 {round.settledPrice !== undefined &&
                   `Start ${usd(round.anchor)} → Finish ${usd(round.settledPrice)}`}
@@ -576,7 +577,7 @@ export default function LiveGame({
                 disabled={busy}
                 onClick={() => {
                   track("game_replay", {
-                    method: "direction_freebie_5s",
+                    method: "next_move",
                     outcome,
                   });
                   void request("prepare");
@@ -600,7 +601,7 @@ export default function LiveGame({
               <h2>
                 {busy ? "Connecting to the market…" : "Ready when you are."}
               </h2>
-              <p>Real Bitcoin. Two choices. Five seconds.</p>
+              <p>Real Bitcoin. Two choices. One next move.</p>
               {!busy && (
                 <button
                   className="game-primary"
@@ -634,9 +635,7 @@ export default function LiveGame({
             </div>
             <div>
               <span>02 / WATCH</span>
-              <p>
-                Five seconds of real Bitcoin movement. One fixed start price.
-              </p>
+              <p>Watch for the first price change after your call locks.</p>
             </div>
             <div>
               <span>03 / KEEP GOING</span>
@@ -672,21 +671,20 @@ export default function LiveGame({
         </>
       )}
       <details className="game-rules">
-        <summary>How Up, Down and free wins work</summary>
+        <summary>How the next move and draws work</summary>
         <p>
-          Reference market: Coinbase Exchange BTC/USD. Before you choose, zones
-          follow the smoothed live price. When the server accepts your choice it
-          fetches the latest trade and fixes the official start price, which may
-          differ slightly from the preview. A one-second lock-in precedes the
-          five-second forecast.
+          Reference market: Coinbase Exchange BTC/USD. Choose Up or Down. The
+          server locks your choice and records its own start time; the first
+          trade after that time at a different cent price decides the round.
+          Trades at the same price are skipped. The displayed chart is delayed
+          by 800ms, so the official starting price can differ from the preview.
         </p>
         <p>
-          Flat means the official finish is within one cent of the start price,
-          including both boundaries. A flat finish counts as a win whether you
-          picked Up or Down. Outside that tiny zone, only the correct direction
-          wins. The official finish is the time-weighted last-trade price over
-          the final second, rounded to cents. The rules stay the same at every
-          streak length.
+          A correct call adds one to your streak; a wrong call resets it. If no
+          price change occurs within 10 seconds, the round is a draw and
+          preserves your streak without adding a point. Feed delays can take a
+          few extra seconds to verify. Missing trade history voids the round
+          safely.
         </p>
         <p>
           The chart keeps its 800ms visual buffer to smoothly interpolate
