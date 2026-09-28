@@ -569,7 +569,7 @@ export default function LiveGame() {
           Network delays can make the displayed chart differ from settlement.
           Missing or stale settlement data voids the round and preserves your
           streak. Keep the tab open for verification; returning more than 60
-          seconds after the finish voids the round. Your streak and best are
+          seconds after the finish ends your streak. Your streak and best are
           saved for this browser with a game cookie. No competitive leaderboard
           or prizes are offered in this beta.
         </p>
