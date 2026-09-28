@@ -41,7 +41,7 @@ test("settlement is time weighted, includes boundaries, never uses post-finish p
     "miss",
   );
   assert.equal(settlement(trades.slice(1), r, NOW + 2000).outcome, "void");
-  assert.equal(settlement(trades, r, NOW + 61000).outcome, "void");
+  assert.equal(settlement(trades, r, NOW + 61000).outcome, "miss");
   assert.deepEqual(cleanTrades([{ time: "bad", price: "no" }]), []);
 });
 function harness() {
@@ -159,4 +159,18 @@ test("expired offers, cross-origin requests and concurrent updates cannot lock",
     503,
   );
   assert.equal(other.state().round.phase, "ready");
+});
+
+test("abandoned rounds reset the streak without depending on market availability", async () => {
+  const h = harness();
+  const offer = await (await h.post({ action: "prepare" })).json();
+  await h.post({ action: "lock", id: offer.round.id, center: 80000 });
+  h.advance(73000);
+  const calls = h.calls();
+  const result = await (
+    await h.post({ action: "settle", id: offer.round.id })
+  ).json();
+  assert.equal(result.round.outcome, "miss");
+  assert.equal(result.streak, 0);
+  assert.equal(h.calls(), calls);
 });

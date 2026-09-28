@@ -39,8 +39,8 @@ export function settlement(trades, round, now) {
   if (now < round.endsAt + 1500) return null;
   if (now > round.endsAt + 60000)
     return {
-      outcome: "void",
-      reason: "Round expired before verification. Your streak is safe.",
+      outcome: "miss",
+      reason: "Round expired before verification. Start a fresh streak.",
     };
   const start = round.endsAt - 1000;
   const before = trades.filter((t) => t.time <= start).at(-1);

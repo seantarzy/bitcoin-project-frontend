@@ -7,7 +7,7 @@
 - Prepare: estimate the 70th percentile absolute 10-second move over up to 2 minutes of recent trades. Half-width is 1.3 times that move, reduced by 12% every two wins, with a 40% difficulty multiplier floor and $0.50 absolute half-width floor.
 - Offer expires in 30 seconds. Chart bounds and band width are fixed. Center may move within three half-widths of the initial price.
 - Lock: server records boundaries and a deadline 12 seconds after acceptance (2-second buffer, 10-second forecast).
-- Settle: time-weighted last-trade price in the final second; inclusive target boundaries. Requires history on both sides of the window. Missing coverage, a feed gap over five seconds at the window boundaries, or settlement over 60 seconds late voids the round.
+- Settle: time-weighted last-trade price in the final second; inclusive target boundaries. Requires history on both sides of the window. Missing coverage or a feed gap over five seconds at the window boundaries voids the round. Settlement over 60 seconds late ends the streak to discourage abandoning a losing round.
 - Only the server changes streak and best. One outstanding round per anonymous browser cookie. Conditional blob writes prevent competing tabs from advancing a run twice. Repeated settle/lock is idempotent.
 
 ## Limits

@@ -107,7 +107,10 @@ export const createGame =
       if (clock() < run.round.endsAt + 1500) return reply(run);
       let result;
       try {
-        result = settlement(await getTrades(), run.round, clock());
+        result =
+          clock() > run.round.endsAt + 60000
+            ? settlement([], run.round, clock())
+            : settlement(await getTrades(), run.round, clock());
       } catch {
         result = {
           outcome: "void",
