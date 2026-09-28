@@ -720,3 +720,54 @@
     font-size: 20px;
   }
 }
+
+/* The homepage opens directly into the game, with discovery below it. */
+.game-embedded {
+  min-height: 0;
+  padding-top: 20px;
+  padding-bottom: 28px;
+}
+.game-embedded .game-intro {
+  margin: 0 auto 18px;
+}
+.game-embedded .game-intro h1 {
+  font-size: clamp(36px, 5vw, 56px);
+  margin: 10px 0;
+  letter-spacing: -2px;
+}
+.game-embedded .game-intro h1 br {
+  display: none;
+}
+.game-embedded .game-intro p {
+  margin: 8px auto;
+}
+.game-embedded .game-chart {
+  max-height: 220px;
+}
+.game-embedded .game-controls {
+  min-height: 0;
+  padding: 16px 22px 20px;
+}
+.game-embedded .game-rules {
+  margin: 18px auto 0;
+}
+@media (max-width: 600px) {
+  .game-embedded {
+    padding: 18px 14px 24px;
+  }
+  .game-embedded .game-intro h1 {
+    font-size: 36px;
+  }
+  .game-embedded .game-intro h1 em {
+    display: block;
+  }
+  .game-embedded .game-chart {
+    max-height: 175px;
+  }
+  .game-embedded .game-chart-head {
+    padding-top: 14px;
+  }
+  .game-embedded .game-controls {
+    padding: 14px 16px 18px;
+  }
+}

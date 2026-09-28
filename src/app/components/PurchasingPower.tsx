@@ -1,5 +1,6 @@
 "use client";
 import { useTrackView } from "../Analytics/useTrackView";
+import LiveGame from "../play/LiveGame";
 import ProductPhoto from "./ProductPhoto";
 import type { Edition } from "./DailyBitcoin";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -386,10 +387,10 @@ export default function PurchasingPower({
         </Link>
         <nav aria-label="Main navigation">
           <Link
-            href="/play"
+            href="#play"
             onClick={() => track("game_entry", { placement: "navigation" })}
           >
-            Play live ↗
+            Play live
           </Link>
           <Link href="/daily">The Daily Bitcoin</Link>
           <a href="#how-it-works">How it works</a>
@@ -406,21 +407,7 @@ export default function PurchasingPower({
         </button>
       </header>
       <main>
-        <Link
-          href="/play"
-          onClick={() => track("game_entry", { placement: "homepage" })}
-          style={{
-            display: "block",
-            textAlign: "center",
-            background: "#c5ff5d",
-            color: "#152010",
-            padding: "14px 20px",
-            fontSize: 13,
-            fontWeight: 700,
-          }}
-        >
-          NEW · Catch Bitcoin’s next move. Play the free live game ↗
-        </Link>
+        <LiveGame embedded />
         <aside ref={teaserRef} className="wrap daily-teaser-wrap">
           <Link
             className="daily-teaser"
@@ -452,7 +439,6 @@ export default function PurchasingPower({
               <ProductPhoto
                 src={dailyEdition.imageUrl}
                 alt="A preview of the latest real-world Bitcoin find"
-                priority
               />
               <span className="daily-teaser-tag">WAIT. HOW MUCH IN ₿?</span>
             </div>
@@ -463,7 +449,7 @@ export default function PurchasingPower({
             <div className="eyebrow">
               <span className="yellow-line" /> LESS CHARTS. MORE POSSIBILITIES.
             </div>
-            <h1>
+            <h2>
               Bitcoin.
               <br />
               But make it
@@ -474,7 +460,7 @@ export default function PurchasingPower({
                   <path d="M4 12Q210 0 392 9M45 18Q200 7 370 14" />
                 </svg>
               </span>
-            </h1>
+            </h2>
             <p className="hero-description">
               You know the price.
               <br />
@@ -493,7 +479,6 @@ export default function PurchasingPower({
               alt="A sculptural Bitcoin coin surrounded by a coffee cup, a home, a car and an airplane"
               width={1024}
               height={1024}
-              priority
               sizes="(max-width: 760px) 100vw, 52vw"
             />
             <span className="art-caption">

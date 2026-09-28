@@ -51,8 +51,10 @@ const usd = (v: number) =>
 const labels = { up: "Up", flat: "Flat", down: "Down" };
 export default function LiveGame({
   challengeTarget = null,
+  embedded = false,
 }: {
   challengeTarget?: number | null;
+  embedded?: boolean;
 }) {
   const [run, setRun] = useState<Run | null>(null),
     [ticks, setTicks] = useState<Tick[]>([]);
@@ -126,7 +128,10 @@ export default function LiveGame({
     [apply],
   );
   useEffect(() => {
-    track("game_view", { method: "direction_5s" });
+    track("game_view", {
+      method: "direction_5s",
+      placement: embedded ? "homepage" : "play",
+    });
     void request("prepare");
     let frame = 0,
       lastFrame = 0;
@@ -140,7 +145,7 @@ export default function LiveGame({
     }
     frame = requestAnimationFrame(animate);
     return () => cancelAnimationFrame(frame);
-  }, [request]);
+  }, [request, embedded]);
   useEffect(() => {
     let ws: WebSocket,
       retry: ReturnType<typeof setTimeout>,
@@ -260,17 +265,24 @@ export default function LiveGame({
     ["flat", upperY, Math.max(1, lowerY - upperY)],
     ["down", lowerY, 310 - lowerY],
   ];
+  const Shell = embedded ? "section" : "main";
   return (
-    <main className="game-shell">
-      <nav className="game-nav">
-        <Link href="/">
-          <ArrowLeft size={17} />
-          Bitcoin / in real life
-        </Link>
-        <Link href="/daily">
-          The daily find <ArrowUpRight size={16} />
-        </Link>
-      </nav>
+    <Shell
+      id={embedded ? "play" : undefined}
+      className={`game-shell ${embedded ? "game-embedded" : ""}`}
+      aria-label={embedded ? "Play live Bitcoin" : undefined}
+    >
+      {!embedded && (
+        <nav className="game-nav">
+          <Link href="/">
+            <ArrowLeft size={17} />
+            Bitcoin / in real life
+          </Link>
+          <Link href="/daily">
+            The daily find <ArrowUpRight size={16} />
+          </Link>
+        </nav>
+      )}
       <div className="game-intro">
         <span className="game-kicker">
           <i />
@@ -612,44 +624,52 @@ export default function LiveGame({
           )}
         </div>
       </section>
-      <div className="game-how">
-        <div>
-          <span>01 / CALL IT</span>
-          <p>Up, flat, or down? Tap your prediction to lock it.</p>
-        </div>
-        <div>
-          <span>02 / WATCH</span>
-          <p>Five seconds of real Bitcoin movement. One fixed start price.</p>
-        </div>
-        <div>
-          <span>03 / KEEP GOING</span>
-          <p>
-            Right call, longer streak. Wrong call, fresh start. Same rules every
-            round.
-          </p>
-        </div>
-      </div>
-      <aside className="game-future">
-        <div>
-          <span className="game-kicker">JUST HERE FOR THE FUN</span>
-          <h2>
-            Big streak energy.
-            <br />
-            Zero money on the line.
-          </h2>
-          <p>
-            Free play. No deposits. No wallet. We’re exploring future rewards;
-            today’s scores have no cash or token value and don’t promise future
-            rewards.
-          </p>
-        </div>
-        <Link
-          href="/daily#subscribe"
-          onClick={() => track("game_newsletter_click", { placement: "game" })}
-        >
-          Get the Daily Bitcoin <ArrowUpRight size={18} />
-        </Link>
-      </aside>
+      {!embedded && (
+        <>
+          <div className="game-how">
+            <div>
+              <span>01 / CALL IT</span>
+              <p>Up, flat, or down? Tap your prediction to lock it.</p>
+            </div>
+            <div>
+              <span>02 / WATCH</span>
+              <p>
+                Five seconds of real Bitcoin movement. One fixed start price.
+              </p>
+            </div>
+            <div>
+              <span>03 / KEEP GOING</span>
+              <p>
+                Right call, longer streak. Wrong call, fresh start. Same rules
+                every round.
+              </p>
+            </div>
+          </div>
+          <aside className="game-future">
+            <div>
+              <span className="game-kicker">JUST HERE FOR THE FUN</span>
+              <h2>
+                Big streak energy.
+                <br />
+                Zero money on the line.
+              </h2>
+              <p>
+                Free play. No deposits. No wallet. We’re exploring future
+                rewards; today’s scores have no cash or token value and don’t
+                promise future rewards.
+              </p>
+            </div>
+            <Link
+              href="/daily#subscribe"
+              onClick={() =>
+                track("game_newsletter_click", { placement: "game" })
+              }
+            >
+              Get the Daily Bitcoin <ArrowUpRight size={18} />
+            </Link>
+          </aside>
+        </>
+      )}
       <details className="game-rules">
         <summary>How Up, Flat, Down and fair play work</summary>
         <p>
@@ -681,6 +701,6 @@ export default function LiveGame({
       {shareScore !== null && (
         <ScoreShare score={shareScore} onClose={() => setShareScore(null)} />
       )}
-    </main>
+    </Shell>
   );
 }

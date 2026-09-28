@@ -178,7 +178,7 @@ select:focus-visible {
   height: 2px;
   background: var(--accent);
 }
-.hero h1 {
+.hero h2 {
   font-size: clamp(65px, 7.3vw, 98px);
   letter-spacing: -6px;
   line-height: 0.98;
@@ -1057,7 +1057,7 @@ h2 {
   .hero {
     min-height: 540px;
   }
-  .hero h1 {
+  .hero h2 {
     font-size: 79px;
   }
   .comparison-grid {
@@ -1149,7 +1149,7 @@ h2 {
     font-size: 8px;
     letter-spacing: 1.5px;
   }
-  .hero h1 {
+  .hero h2 {
     font-size: 78px;
     letter-spacing: -4.5px;
     margin: 27px 0 32px;
@@ -1457,7 +1457,7 @@ h2 {
   flex-shrink: 0;
 }
 @media (max-width: 760px) {
-  .hero h1 {
+  .hero h2 {
     font-size: clamp(52px, 17vw, 70px);
   }
 }
