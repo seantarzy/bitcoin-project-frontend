@@ -4,8 +4,10 @@ import Link from "next/link";
 import {
   ArrowLeft,
   ArrowUpRight,
+  ArrowUp,
+  ArrowDown,
+  Minus,
   Flame,
-  Crosshair,
   Share2,
   Trophy,
 } from "lucide-react";
@@ -14,19 +16,20 @@ import { chartSeries, DISPLAY_DELAY_MS } from "@/services/gameChart";
 import ScoreShare from "./ScoreShare";
 import "./game.css";
 type Tick = { time: number; price: number };
+type Direction = "up" | "flat" | "down";
 type Round = {
   id: string;
   phase: "ready" | "locked" | "done";
   anchor: number;
-  halfWidth: number;
-  chartHalfSpan?: number;
-  forecastMs?: number;
-  bufferMs?: number;
+  flatHalfWidth: number;
+  chartHalfSpan: number;
+  forecastMs: number;
+  bufferMs: number;
   expiresAt: number;
   startsAt?: number;
   endsAt?: number;
-  low?: number;
-  high?: number;
+  direction?: Direction;
+  actualDirection?: Direction;
   outcome?: "win" | "miss" | "void";
   settledPrice?: number;
   reason?: string;
@@ -45,50 +48,52 @@ const usd = (v: number) =>
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   });
+const labels = { up: "Up", flat: "Flat", down: "Down" };
 export default function LiveGame({
   challengeTarget = null,
 }: {
   challengeTarget?: number | null;
 }) {
   const [run, setRun] = useState<Run | null>(null),
-    [ticks, setTicks] = useState<Tick[]>([]),
-    [center, setCenter] = useState(0);
+    [ticks, setTicks] = useState<Tick[]>([]);
   const [now, setNow] = useState(Date.now()),
     [busy, setBusy] = useState(false),
     [error, setError] = useState(""),
-    [connection, setConnection] = useState(false),
-    [shareScore, setShareScore] = useState<number | null>(null),
-    [aimed, setAimed] = useState(false);
+    [connected, setConnected] = useState(false),
+    [hover, setHover] = useState<Direction | null>(null),
+    [shareScore, setShareScore] = useState<number | null>(null);
   const [finish, setFinish] = useState<{ id: string; ticks: Tick[] } | null>(
     null,
   );
   const offset = useRef(0),
     pending = useRef(false),
-    seen = useRef(""),
-    aimedRound = useRef(""),
-    chart = useRef<SVGSVGElement>(null);
+    seen = useRef("");
   const round = run?.round,
-    locked = round?.phase === "locked",
-    ready = round?.phase === "ready";
+    ready = round?.phase === "ready",
+    locked = round?.phase === "locked";
   const apply = useCallback((data: Run) => {
     offset.current = data.serverNow - Date.now();
     setNow(data.serverNow);
     setRun(data);
-    if (data.round.phase === "ready") {
-      setCenter(data.round.anchor);
-      setAimed(false);
-    }
-    if (data.history?.length) setTicks(data.history);
+    setHover(null);
+    if (data.history?.length)
+      setTicks((old) => {
+        const latest = data.history!.at(-1)!.time;
+        return [...data.history!, ...old.filter((t) => t.time > latest)].slice(
+          -1500,
+        );
+      });
     if (data.round.phase === "done" && seen.current !== data.round.id) {
       seen.current = data.round.id;
       track("game_round_result", {
+        method: "direction_5s",
         outcome: data.round.outcome,
-        method: "live_5s",
+        category: data.round.direction,
       });
     }
   }, []);
   const request = useCallback(
-    async (action: string, id?: string, target?: number) => {
+    async (action: string, id?: string, direction?: Direction) => {
       if (pending.current) return;
       pending.current = true;
       setBusy(true);
@@ -98,19 +103,20 @@ export default function LiveGame({
           method: "POST",
           signal: AbortSignal.timeout(12000),
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ action, id, center: target }),
+          body: JSON.stringify({ action, id, direction }),
         });
         const data = await r.json();
         if (!r.ok)
-          throw new Error(data.error || "Game unavailable. Please retry.");
+          throw Error(data.error || "Could not connect. Please retry.");
         apply(data);
         if (action === "lock")
-          track("game_round_locked", { method: "live_5s" });
+          track("game_round_locked", {
+            method: "direction_5s",
+            category: direction,
+          });
       } catch (e) {
         setError(
-          e instanceof Error
-            ? e.message
-            : "Connection lost. Retry to resume your round.",
+          e instanceof Error ? e.message : "Connection lost. Retry to resume.",
         );
       } finally {
         pending.current = false;
@@ -120,7 +126,7 @@ export default function LiveGame({
     [apply],
   );
   useEffect(() => {
-    track("game_view", { method: "live_5s" });
+    track("game_view", { method: "direction_5s" });
     void request("prepare");
     let frame = 0,
       lastFrame = 0;
@@ -160,20 +166,22 @@ export default function LiveGame({
             tick.price <= 0
           )
             return;
-          setConnection(true);
+          setConnected(true);
           setTicks((old) =>
-            [
-              ...old.filter(
-                (t) => t.time >= tick.time - 60000 && t.time < tick.time,
-              ),
-              tick,
-            ].slice(-1500),
+            tick.time < (old.at(-1)?.time || 0)
+              ? old
+              : [
+                  ...old.filter(
+                    (t) => t.time >= tick.time - 60000 && t.time < tick.time,
+                  ),
+                  tick,
+                ].slice(-1500),
           );
         } catch {}
       };
       ws.onerror = () => ws.close();
       ws.onclose = () => {
-        setConnection(false);
+        setConnected(false);
         if (!stopped) retry = setTimeout(connect, 2500);
       };
     }
@@ -190,30 +198,13 @@ export default function LiveGame({
     const timer = setTimeout(() => void request("settle", round?.id), 500);
     return () => clearTimeout(timer);
   }, [due, error, busy, request, round?.id]);
-  const last = ticks.at(-1),
-    fresh = connection && !!last && now - last.time < 5000;
-  const anchor = round?.anchor || last?.price || 0,
-    width = round?.halfWidth || 10;
-  const span = round?.chartHalfSpan || width * 4.6;
-  const min = anchor - span,
-    max = anchor + span;
-  const targetReach = Math.max(0, span - width);
-  const displayTime = now - DISPLAY_DELAY_MS;
-  const forecastMs =
-    round?.forecastMs ??
-    (round?.endsAt && round?.startsAt ? round.endsAt - round.startsAt : 5000);
-  const bufferMs = round?.bufferMs ?? 1000;
-  const y = (p: number) => 310 - ((p - min) / (max - min)) * 280;
-  const end =
-    round?.endsAt && !ready
-      ? round.endsAt
-      : displayTime + forecastMs + bufferMs;
-  const start = end - 25000,
-    x = (t: number) => 32 + ((t - start) / 25000) * 716;
   useEffect(() => {
     if (round?.phase === "done" && finish?.id !== round.id)
       setFinish({ id: round.id, ticks });
   }, [round, ticks, finish]);
+  const displayTime = now - DISPLAY_DELAY_MS;
+  const end = round?.endsAt && !ready ? round.endsAt : displayTime + 6000,
+    start = end - 25000;
   const visible = chartSeries(
     round?.phase === "done" && finish?.id === round.id ? finish.ticks : ticks,
     start,
@@ -223,50 +214,58 @@ export default function LiveGame({
     round?.phase === "done" && round.settledPrice !== undefined
       ? round.settledPrice
       : visible.at(-1)?.price;
+  const reference = ready
+    ? (displayPrice ?? round.anchor)
+    : round?.anchor || displayPrice || 0;
+  const span = round?.chartHalfSpan || 20,
+    flat = round?.flatHalfWidth || 0.01;
+  const axisCenter = ready
+    ? Math.max(
+        reference - span * 0.5,
+        Math.min(reference + span * 0.5, round.anchor),
+      )
+    : reference;
+  const min = axisCenter - span,
+    max = axisCenter + span;
+  const y = (price: number) => 310 - ((price - min) / (max - min)) * 280,
+    x = (time: number) => 32 + ((time - start) / 25000) * 716;
   const path = visible
     .map(
       (t, i) =>
         `${i ? "L" : "M"}${x(t.time).toFixed(1)},${y(t.price).toFixed(1)}`,
     )
     .join(" ");
-  const selected = ready
-    ? center
-    : ((round?.low || 0) + (round?.high || 0)) / 2;
+  const upperY = Math.max(30, Math.min(310, y(reference + flat))),
+    lowerY = Math.max(30, Math.min(310, y(reference - flat)));
+  const last = ticks.at(-1),
+    fresh = connected && !!last && now - last.time < 5000;
+  const expired = ready && now > round.expiresAt,
+    canChoose = ready && !expired && !busy && fresh;
   const remaining = Math.max(
     0,
-    Math.min(forecastMs / 1000, ((round?.endsAt || 0) - displayTime) / 1000),
+    Math.min(5, ((round?.endsAt || 0) - displayTime) / 1000),
   );
-  const expired = ready && now > round.expiresAt;
-  function markAimed(method: "chart" | "slider") {
-    setAimed(true);
-    if (round && aimedRound.current !== round.id) {
-      aimedRound.current = round.id;
-      track("game_target_placed", { method });
-    }
-  }
-  function drag(e: React.PointerEvent<SVGSVGElement>) {
-    if (!ready || busy || expired) return;
-    markAimed("chart");
-    const box = chart.current!.getBoundingClientRect();
-    const pos = ((e.clientY - box.top) / box.height) * 350;
-    const value = max - ((pos - 30) / 280) * (max - min);
-    setCenter(
-      Math.round(
-        Math.max(anchor - targetReach, Math.min(anchor + targetReach, value)) *
-          100,
-      ) / 100,
-    );
+  const locking = locked && displayTime < (round.startsAt || 0);
+  const selected = ready ? hover : round?.direction;
+  function choose(direction: Direction) {
+    if (canChoose) void request("lock", round.id, direction);
   }
   function share() {
     setShareScore(Math.min(run?.best || 0, 9999));
-    track("game_share_opened", { method: "score_card" });
+    track("game_share_opened", { method: "direction_card" });
   }
   const outcome = round?.outcome;
+  const zones: [Direction, number, number][] = [
+    ["up", 30, upperY - 30],
+    ["flat", upperY, Math.max(1, lowerY - upperY)],
+    ["down", lowerY, 310 - lowerY],
+  ];
   return (
     <main className="game-shell">
       <nav className="game-nav">
         <Link href="/">
-          <ArrowLeft size={17} /> Bitcoin / in real life
+          <ArrowLeft size={17} />
+          Bitcoin / in real life
         </Link>
         <Link href="/daily">
           The daily find <ArrowUpRight size={16} />
@@ -274,15 +273,14 @@ export default function LiveGame({
       </nav>
       <div className="game-intro">
         <span className="game-kicker">
-          <i /> LIVE BITCOIN / FREE TO PLAY
+          <i />
+          LIVE BITCOIN / FREE TO PLAY
         </span>
         <h1>
           Catch the <br />
           <em>next move.</em>
         </h1>
-        <p>
-          Five seconds. One target. How long can you keep your streak alive?
-        </p>
+        <p>Up, flat, or down? Call Bitcoin’s next five seconds.</p>
       </div>
       {challengeTarget !== null && (
         <div className="game-challenge" role="status">
@@ -290,7 +288,7 @@ export default function LiveGame({
           <strong>
             {(run?.best || 0) > challengeTarget
               ? "Challenge beaten. Set the next record."
-              : `Beat ${challengeTarget} ${challengeTarget === 1 ? "move" : "moves"} in a row.`}
+              : `Beat ${challengeTarget} ${challengeTarget === 1 ? "call" : "calls"} in a row.`}
           </strong>
           <small>Live markets change. Every run is its own challenge.</small>
         </div>
@@ -298,10 +296,12 @@ export default function LiveGame({
       <section className="game-arena" aria-label="Live Bitcoin prediction game">
         <div className="game-score">
           <span>
-            <Flame size={20} /> STREAK <strong>{run?.streak || 0}</strong>
+            <Flame size={20} />
+            STREAK <strong>{run?.streak || 0}</strong>
           </span>
           <span>
-            <Trophy size={18} /> 5s BEST <strong>{run?.best || 0}</strong>
+            <Trophy size={18} />
+            BEST <strong>{run?.best || 0}</strong>
           </span>
           <span className={fresh ? "feed-live" : "feed-wait"}>
             <i />
@@ -328,114 +328,79 @@ export default function LiveGame({
                   <small>s</small>
                 </strong>
                 <span>
-                  {displayTime < (round.startsAt || 0)
-                    ? "LOCKING YOUR RANGE"
+                  {locking
+                    ? "LOCKING YOUR CALL"
                     : remaining > 0
-                      ? "FOLLOW THE PRICE"
+                      ? `${labels[round.direction!].toUpperCase()} LOCKED`
                       : "VERIFYING RESULT"}
                 </span>
               </>
             ) : (
               <>
-                <Crosshair size={25} />
-                <span>
-                  {ready
-                    ? aimed
-                      ? "TARGET PLACED"
-                      : "PLACE YOUR TARGET"
-                    : "YOUR NEXT MOVE"}
-                </span>
+                <span className="direction-glyph">↗ → ↘</span>
+                <span>{ready ? "MAKE YOUR CALL" : "YOUR NEXT MOVE"}</span>
               </>
             )}
           </div>
         </div>
         <svg
-          ref={chart}
-          className={`game-chart ${ready ? "can-drag" : ""}`}
+          className={`game-chart direction-chart ${canChoose ? "can-choose" : ""}`}
           viewBox="0 0 800 350"
           preserveAspectRatio="none"
           role="img"
-          aria-label="Live Bitcoin chart. Use the target slider below to choose your price range."
-          onPointerDown={(e) => {
-            if (ready) {
-              e.currentTarget.setPointerCapture(e.pointerId);
-              drag(e);
-            }
-          }}
-          onPointerMove={(e) => {
-            if (e.currentTarget.hasPointerCapture(e.pointerId)) drag(e);
-          }}
+          aria-label="Live chart with Up, Flat, and Down zones. Use the matching buttons below to make a prediction."
         >
           <defs>
-            <linearGradient id="target-fill">
-              <stop stopColor="#c5ff5d" stopOpacity=".03" />
-              <stop offset="1" stopColor="#c5ff5d" stopOpacity=".24" />
-            </linearGradient>
-            <clipPath id="plot-clip">
-              <rect x="0" y="15" width="800" height="310" />
+            <clipPath id="direction-plot">
+              <rect x="28" y="30" width="720" height="280" />
             </clipPath>
           </defs>
+          {round &&
+            zones.map(([direction, top, height]) => (
+              <rect
+                key={direction}
+                className={`direction-zone zone-${direction} ${selected === direction ? "zone-active" : ""}`}
+                x="28"
+                y={top}
+                width="720"
+                height={height}
+                onPointerEnter={() => {
+                  if (canChoose) setHover(direction);
+                }}
+                onPointerLeave={() => setHover(null)}
+                onClick={() => choose(direction)}
+              />
+            ))}
           {[0, 1, 2, 3, 4].map((i) => (
-            <g key={i}>
+            <g key={i} pointerEvents="none">
               <line
-                x1="25"
-                x2="760"
+                x1="28"
+                x2="748"
                 y1={30 + i * 70}
                 y2={30 + i * 70}
-                stroke="#ffffff0e"
+                stroke="#ffffff0c"
               />
               <text
-                x="758"
-                y={24 + i * 70}
+                x="740"
+                y={25 + i * 70}
                 textAnchor="end"
-                fill="#7b8581"
+                fill="#87917f"
                 fontSize="11"
               >
                 {usd(max - (i * (max - min)) / 4)}
               </text>
             </g>
           ))}
-          <g clipPath="url(#plot-clip)">
-            {round && (!ready || aimed) && (
-              <>
-                <rect
-                  x="28"
-                  y={y(selected + width)}
-                  width="720"
-                  height={y(selected - width) - y(selected + width)}
-                  rx="5"
-                  fill="url(#target-fill)"
-                  stroke="#c5ff5d"
-                  strokeDasharray={ready ? "5 5" : "0"}
-                  opacity=".85"
-                />
-                <line
-                  x1="28"
-                  x2="748"
-                  y1={y(selected)}
-                  y2={y(selected)}
-                  stroke="#c5ff5d"
-                  opacity=".25"
-                />
-              </>
-            )}
+          <g clipPath="url(#direction-plot)" pointerEvents="none">
             <line
-              x1="748"
+              x1="28"
               x2="748"
-              y1="20"
-              y2="320"
-              stroke="#c5ff5d"
-              strokeDasharray="3 6"
-              opacity=".5"
+              y1={y(reference)}
+              y2={y(reference)}
+              stroke="#f4e997"
+              strokeDasharray="4 5"
+              opacity=".7"
             />
-            {round?.settledPrice !== undefined && (
-              <circle
-                cx="748"
-                cy={y(round.settledPrice)}
-                r="7"
-                fill={outcome === "win" ? "#c5ff5d" : "#f9b08b"}
-              />
-            )}
             <path
               d={path}
               fill="none"
@@ -448,133 +413,128 @@ export default function LiveGame({
                 cx={x(visible.at(-1)!.time)}
                 cy={y(visible.at(-1)!.price)}
                 r="5"
-                fill="#c5ff5d"
+                fill="#f6f7f2"
+              />
+            )}
+            {round?.settledPrice !== undefined && (
+              <circle
+                cx="748"
+                cy={y(round.settledPrice)}
+                r="7"
+                fill={outcome === "win" ? "#c5ff5d" : "#f9b08b"}
               />
             )}
           </g>
-          {ready && !aimed && (
-            <g className="game-aim-hint">
-              <rect
-                x="220"
-                y="125"
-                width="360"
-                height="80"
-                rx="12"
-                fill="#101613"
-                opacity=".92"
-              />
+          {round && (
+            <g pointerEvents="none" className="direction-zone-labels">
               <text
-                x="400"
-                y="159"
-                textAnchor="middle"
+                x="60"
+                y={Math.max(55, upperY - 15)}
                 fill="#c5ff5d"
                 fontSize="18"
               >
-                Tap the chart to place your target
+                ↑ UP {hover === "up" && canChoose ? "· CLICK TO CALL" : ""}
               </text>
               <text
-                x="400"
-                y="185"
-                textAnchor="middle"
-                fill="#a4af9d"
-                fontSize="13"
+                x="60"
+                y={Math.min(297, lowerY + 28)}
+                fill="#f4ad9b"
+                fontSize="18"
               >
-                or use the slider below
+                ↓ DOWN {hover === "down" && canChoose ? "· CLICK TO CALL" : ""}
+              </text>
+              <text
+                x="733"
+                y={y(reference) - 7}
+                textAnchor="end"
+                fill="#f4e997"
+                fontSize="12"
+              >
+                {ready ? "CURRENT" : "START"} {usd(reference)}
               </text>
             </g>
           )}
           <text x="748" y="343" fill="#c5ff5d" textAnchor="end" fontSize="11">
-            FINISH
+            {locked ? "FINISH" : "CHOOSE A ZONE"}
           </text>
-          <text x="28" y="343" fill="#7b8581" fontSize="11">
-            REAL MARKET. YOUR CALL.
+          <text x="28" y="343" fill="#9baa93" fontSize="11">
+            FLAT = WITHIN {usd(flat)} OF{" "}
+            {ready ? "THE START PRICE" : "YOUR START PRICE"}
           </text>
         </svg>
         <div className="game-controls">
           {ready && (
             <>
-              <label htmlFor="target">
-                Your landing zone{" "}
-                <strong>
-                  {aimed
-                    ? `${usd(center - width)} – ${usd(center + width)}`
-                    : "Choose where Bitcoin will finish"}
-                </strong>
-              </label>
-              <input
-                id="target"
-                aria-label="Target price center"
-                type="range"
-                min={anchor - targetReach}
-                max={anchor + targetReach}
-                step="0.01"
-                value={center}
-                disabled={busy || expired}
-                onPointerDown={() => {
-                  if (!busy && !expired) markAimed("slider");
-                }}
-                onKeyDown={(e) => {
-                  if (
-                    [
-                      "ArrowLeft",
-                      "ArrowRight",
-                      "ArrowUp",
-                      "ArrowDown",
-                      "Home",
-                      "End",
-                      "PageUp",
-                      "PageDown",
-                    ].includes(e.key)
-                  )
-                    markAimed("slider");
-                }}
-                onChange={(e) => {
-                  setCenter(Number(e.target.value));
-                  markAimed("slider");
-                }}
-              />
-              <div className="target-hints">
-                <span>Lower</span>
-                <span>Drag the band or move the slider</span>
-                <span>Higher</span>
+              <div className="direction-question">
+                <h2>Where will it finish?</h2>
+                <p>Tap a shaded area or pick your call below.</p>
               </div>
-              <button
-                className="game-primary"
-                disabled={busy || ((!fresh || !aimed) && !expired)}
-                onClick={() =>
-                  void request(expired ? "prepare" : "lock", round.id, center)
-                }
-              >
-                {busy
-                  ? "Locking…"
-                  : expired
-                    ? "Refresh target"
-                    : !aimed
-                      ? "Place your target to play"
-                      : "Lock my prediction"}{" "}
-                <ArrowUpRight size={20} />
-              </button>
-              <p className="game-footnote">
-                {expired
-                  ? "Your target expired. Refresh for current volatility."
-                  : `${forecastMs / 1000}-second round · ${bufferMs / 1000}s lock-in · Target width ${usd(width * 2)}`}
+              <div className="direction-options">
+                {(["up", "flat", "down"] as Direction[]).map((direction) => (
+                  <button
+                    key={direction}
+                    className={`direction-option option-${direction} ${hover === direction ? "option-active" : ""}`}
+                    disabled={!canChoose}
+                    onPointerEnter={() => setHover(direction)}
+                    onPointerLeave={() => setHover(null)}
+                    onFocus={() => setHover(direction)}
+                    onBlur={() => setHover(null)}
+                    onClick={() => choose(direction)}
+                  >
+                    {direction === "up" ? (
+                      <ArrowUp size={23} />
+                    ) : direction === "down" ? (
+                      <ArrowDown size={23} />
+                    ) : (
+                      <Minus size={23} />
+                    )}
+                    <strong>{labels[direction]}</strong>
+                    <small>
+                      {direction === "up"
+                        ? `Above ${usd(reference + flat)}`
+                        : direction === "down"
+                          ? `Below ${usd(reference - flat)}`
+                          : `±${usd(flat)} of start`}
+                    </small>
+                  </button>
+                ))}
+              </div>
+              {expired ? (
+                <button
+                  className="game-primary direction-refresh"
+                  disabled={busy}
+                  onClick={() => void request("prepare")}
+                >
+                  Refresh round <ArrowUpRight size={18} />
+                </button>
+              ) : (
+                <p className="game-footnote">
+                  {busy
+                    ? "Locking your call and checking the start price…"
+                    : "One tap locks your call · 1s lock-in + 5s forecast"}
+                </p>
+              )}
+              <p className="direction-start-note">
+                Zones follow the price until you choose. The server then locks
+                the official start price.
               </p>
             </>
           )}
           {locked && (
-            <div className="game-watching">
+            <div className={`game-watching ${locking ? "is-locking" : ""}`}>
               <span className="watch-dot" />
               <h2>
-                {displayTime < (round.startsAt || 0)
-                  ? "Locking your range…"
+                {locking
+                  ? "Locking your call…"
                   : remaining > 0
-                    ? "Five seconds. Make them count."
+                    ? `${labels[round.direction!]} is your call. Watch the line.`
                     : "Checking the official finish…"}
               </h2>
               <p>
-                {usd(round.low!)} – {usd(round.high!)}
+                Start: <strong>{usd(round.anchor)}</strong> · Flat:{" "}
+                {usd(round.anchor - flat)} – {usd(round.anchor + flat)}
                 <br />
-                Your band stays fixed. The market makes the next move.
+                Your start price stays fixed until the round ends.
               </p>
             </div>
           )}
@@ -582,9 +542,9 @@ export default function LiveGame({
             <div className={`game-result result-${outcome}`} aria-live="polite">
               <span className="result-label">
                 {outcome === "win"
-                  ? "CAUGHT IT"
+                  ? "CALLED IT"
                   : outcome === "miss"
-                    ? "JUST MISSED"
+                    ? "WRONG WAY"
                     : "ROUND VOIDED"}
               </span>
               <h2>
@@ -596,21 +556,24 @@ export default function LiveGame({
               </h2>
               <p>
                 {round.reason ||
-                  `Official finish: ${usd(round.settledPrice!)} · Your band: ${usd(round.low!)} – ${usd(round.high!)}`}
+                  `You called ${labels[round.direction!]}. It finished ${labels[round.actualDirection!]}.`}
+                <br />
+                {round.settledPrice !== undefined &&
+                  `Start ${usd(round.anchor)} → Finish ${usd(round.settledPrice)}`}
               </p>
               <button
                 className="game-primary"
                 disabled={busy}
                 onClick={() => {
-                  track("game_replay", { outcome });
+                  track("game_replay", { method: "direction_5s", outcome });
                   void request("prepare");
                 }}
               >
                 {busy
-                  ? "Finding your next target…"
+                  ? "Getting the next round…"
                   : outcome === "win"
-                    ? "Catch the next one"
-                    : "Play again"}{" "}
+                    ? "Make the next call"
+                    : "Play again"}
                 <ArrowUpRight size={20} />
               </button>
               <button className="game-share" onClick={share}>
@@ -621,8 +584,10 @@ export default function LiveGame({
           )}
           {!round && (
             <div className="game-watching">
-              <h2>{busy ? "Reading the market…" : "Ready when you are."}</h2>
-              <p>We size your target to Bitcoin’s recent movement.</p>
+              <h2>
+                {busy ? "Connecting to the market…" : "Ready when you are."}
+              </h2>
+              <p>Real Bitcoin. Three choices. Five seconds.</p>
               {!busy && (
                 <button
                   className="game-primary"
@@ -649,17 +614,18 @@ export default function LiveGame({
       </section>
       <div className="game-how">
         <div>
-          <span>01 / AIM</span>
-          <p>Slide your band to where Bitcoin will land.</p>
+          <span>01 / CALL IT</span>
+          <p>Up, flat, or down? Tap your prediction to lock it.</p>
         </div>
         <div>
           <span>02 / WATCH</span>
-          <p>Lock it. Follow five seconds of real market movement.</p>
+          <p>Five seconds of real Bitcoin movement. One fixed start price.</p>
         </div>
         <div>
-          <span>03 / REPEAT</span>
+          <span>03 / KEEP GOING</span>
           <p>
-            Start wide. Catch the finish. Your target shrinks after every win.
+            Right call, longer streak. Wrong call, fresh start. Same rules every
+            round.
           </p>
         </div>
       </div>
@@ -685,26 +651,31 @@ export default function LiveGame({
         </Link>
       </aside>
       <details className="game-rules">
-        <summary>How pricing, timing, and fair play work</summary>
+        <summary>How Up, Flat, Down and fair play work</summary>
         <p>
-          Reference market: Coinbase Exchange BTC/USD. Targets use recent
-          5-second price moves and stay fixed for the round. Opening targets are
-          generous; each win shrinks the next target by at least 20%, down to a
-          $1 minimum width. After the server accepts your prediction, a 1-second
-          lock-in precedes the 5-second forecast. The chart uses an
-          800-millisecond visual buffer to interpolate received trades; it never
-          predicts future prices. Settlement timing is not delayed. The official
-          finish is the time-weighted last-trade price over the final second,
-          calculated on the server—not the last dot on your screen. Boundaries
-          count as a hit.
+          Reference market: Coinbase Exchange BTC/USD. Before you choose, zones
+          follow the smoothed live price. When the server accepts your choice it
+          fetches the latest trade and fixes the official start price, which may
+          differ slightly from the preview. A one-second lock-in precedes the
+          five-second forecast.
         </p>
         <p>
-          Network delays can make the displayed chart differ from settlement.
-          Missing or stale settlement data voids the round and preserves your
-          streak. Keep the tab open for verification; returning more than 60
-          seconds after the finish ends your streak. Your streak and best are
-          saved for this browser with a game cookie. No competitive leaderboard
-          or prizes are offered in this beta.
+          Flat means within the displayed dollar tolerance of the start price,
+          including both boundaries and an exactly unchanged price. Up is
+          strictly above that zone; Down is strictly below it. The tolerance is
+          15% of a recent typical five-second move, with a one-cent minimum. It
+          adapts to the market, never to your streak. The official finish is the
+          time-weighted last-trade price over the final second, rounded to
+          cents. Every verified result has exactly one outcome.
+        </p>
+        <p>
+          The chart keeps its 800ms visual buffer to smoothly interpolate
+          received trades. It never predicts future prices or changes server
+          timing. Missing or stale settlement data voids the round and preserves
+          your streak; verification more than 60 seconds late ends the run. Your
+          streak and personal best are saved in this browser using a game
+          cookie. Scores from previous modes are archived separately. No prizes
+          or competitive leaderboard are offered in this beta.
         </p>
       </details>
       {shareScore !== null && (

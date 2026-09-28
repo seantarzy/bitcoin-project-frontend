@@ -50,14 +50,19 @@ export const createGame =
           throw new Error("Another tab updated this game. Reload to resume.");
       };
       if (body.action === "prepare") {
-        if (run.round?.phase === "locked") return reply(run);
-        if (run.rulesVersion !== 2) {
+        if (run.rulesVersion !== 3) {
+          run.legacyBests = {
+            ...run.legacyBests,
+            [run.rulesVersion || 1]: run.best || 0,
+          };
+          if (run.round?.phase === "locked") run.legacyRound = run.round;
           run.legacyBest = Math.max(run.legacyBest || 0, run.best || 0);
           run.streak = 0;
           run.best = 0;
           run.round = null;
-          run.rulesVersion = 2;
+          run.rulesVersion = 3;
         }
+        if (run.round?.phase === "locked") return reply(run);
         const trades = await getTrades(),
           now = clock();
         if (
@@ -68,7 +73,7 @@ export const createGame =
           run.round = {
             id: randomBytes(16).toString("hex"),
             phase: "ready",
-            ...makeOffer(trades, run.streak, now, run.round),
+            ...makeOffer(trades, run.streak, now),
           };
           await commit();
         }
@@ -85,30 +90,33 @@ export const createGame =
       if (body.action === "lock") {
         if (run.round.phase === "locked" || run.round.phase === "done")
           return reply(run);
-        const now = clock(),
-          r = run.round;
-        if (r.expiresAt < now)
+        const r = run.round;
+        if (r.rulesVersion !== 3)
           return reply(
-            { error: "Target expired. Refresh the target and try again." },
+            { error: "The game has changed. Reload to play Up, Flat or Down." },
             409,
           );
-        if (
-          !Number.isFinite(body.center) ||
-          Math.abs(body.center - r.anchor) >
-            (r.chartHalfSpan
-              ? r.chartHalfSpan - r.halfWidth
-              : r.halfWidth * 3) +
-              0.000001
-        )
-          return reply({ error: "Choose a target inside the chart." }, 400);
+        if (r.expiresAt < clock())
+          return reply({ error: "Round expired. Refresh to play." }, 409);
+        if (!["up", "flat", "down"].includes(body.direction))
+          return reply({ error: "Choose Up, Flat or Down." }, 400);
+        const trades = await getTrades();
+        const now = clock(),
+          latest = trades.at(-1);
+        if (!latest || now - latest.time > 5000 || latest.time > now + 2000)
+          return reply(
+            { error: "Market feed is delayed. Please try again." },
+            503,
+          );
         run.round = {
           ...r,
           phase: "locked",
-          low: body.center - r.halfWidth,
-          high: body.center + r.halfWidth,
-          startsAt: now + (r.bufferMs ?? BUFFER_MS),
-          endsAt:
-            now + (r.bufferMs ?? BUFFER_MS) + (r.forecastMs ?? FORECAST_MS),
+          direction: body.direction,
+          anchor: latest.price,
+          low: latest.price - r.flatHalfWidth,
+          high: latest.price + r.flatHalfWidth,
+          startsAt: now + BUFFER_MS,
+          endsAt: now + BUFFER_MS + FORECAST_MS,
         };
         await commit();
         return reply(run);

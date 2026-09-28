@@ -581,3 +581,142 @@
     font-size: 9px;
   }
 }
+.direction-chart {
+  touch-action: pan-y;
+}
+.direction-zone {
+  transition: fill-opacity 0.15s ease;
+  fill-opacity: 0.055;
+}
+.zone-up {
+  fill: #c5ff5d;
+}
+.zone-flat {
+  fill: #f4e997;
+  fill-opacity: 0.22;
+}
+.zone-down {
+  fill: #ed957d;
+}
+.can-choose .direction-zone {
+  cursor: pointer;
+}
+.direction-zone.zone-active {
+  fill-opacity: 0.26;
+}
+.zone-flat.zone-active {
+  fill-opacity: 0.5;
+}
+.direction-glyph {
+  font-size: 24px;
+  letter-spacing: 6px;
+}
+.direction-question {
+  text-align: center;
+  margin-bottom: 18px;
+}
+.direction-question h2 {
+  font-size: 22px;
+  letter-spacing: -0.5px;
+}
+.direction-question p,
+.direction-start-note {
+  color: #a4af9d;
+  font-size: 11px;
+  line-height: 1.6;
+  margin-top: 6px;
+}
+.direction-start-note {
+  text-align: center;
+  margin: 12px 0 0;
+}
+.direction-options {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+.direction-option {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid #45513f;
+  border-radius: 12px;
+  padding: 18px 8px;
+  background: #111a14;
+  color: #c5ff5d;
+  cursor: pointer;
+  transition:
+    background 0.15s,
+    border-color 0.15s;
+}
+.direction-option strong {
+  font-size: 20px;
+}
+.direction-option small {
+  font-size: 10px;
+  color: #aeb9a7;
+  white-space: nowrap;
+}
+.option-flat {
+  color: #f4e997;
+}
+.option-down {
+  color: #f4ad9b;
+}
+.direction-option.option-active:not(:disabled) {
+  background: #c5ff5d19;
+  border-color: currentColor;
+}
+.option-flat.option-active:not(:disabled) {
+  background: #f4e99719;
+}
+.option-down.option-active:not(:disabled) {
+  background: #f4ad9b19;
+}
+.direction-option:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.direction-refresh {
+  margin-top: 15px;
+}
+.is-locking .watch-dot {
+  animation: call-pulse 0.6s ease-in-out infinite alternate;
+}
+@keyframes call-pulse {
+  from {
+    transform: scale(0.7);
+    opacity: 0.4;
+  }
+  to {
+    transform: scale(1.25);
+    opacity: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .direction-zone,
+  .direction-option {
+    transition: none;
+  }
+  .is-locking .watch-dot {
+    animation: none;
+  }
+}
+@media (max-width: 600px) {
+  .direction-options {
+    gap: 8px;
+  }
+  .direction-option {
+    padding: 15px 4px;
+  }
+  .direction-option small {
+    font-size: 9px;
+  }
+  .direction-option strong {
+    font-size: 18px;
+  }
+  .direction-zone-labels text {
+    font-size: 20px;
+  }
+}

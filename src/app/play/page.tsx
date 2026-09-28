@@ -7,9 +7,9 @@ export function generateMetadata({ searchParams }: Props): Metadata {
   const title =
     score === null
       ? "Catch the next move · Live Bitcoin game"
-      : `Can you beat ${score} Bitcoin ${score === 1 ? "move" : "moves"} in a row?`;
+      : `Can you beat ${score} Bitcoin ${score === 1 ? "call" : "calls"} in a row?`;
   const description =
-    "Five seconds. One target. Catch Bitcoin’s next move. Play free and challenge a friend.";
+    "Up, Flat, or Down? Call Bitcoin’s next five seconds. Play free and challenge a friend.";
   const images = [
     {
       url: `/play/card?score=${score ?? 0}`,

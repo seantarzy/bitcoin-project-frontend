@@ -12,8 +12,8 @@ export default function ScoreShare({
   const dialog = useRef<HTMLDialogElement>(null);
   const [asset, setAsset] = useState<{ url: string; file: File } | null>(null),
     [message, setMessage] = useState("");
-  const link = `https://whatsbitcoinsprice.com/play?beat=${score}&utm_source=player&utm_medium=share&utm_campaign=live_game_v2`;
-  const text = `Catch the next move\n${"🟩".repeat(Math.min(score, 12))}${score > 12 ? ` +${score - 12}` : ""}\n${score} Bitcoin ${score === 1 ? "move" : "moves"} in a row. Can you beat my streak?`;
+  const link = `https://whatsbitcoinsprice.com/play?beat=${score}&utm_source=player&utm_medium=share&utm_campaign=direction_game`;
+  const text = `Catch the next move\n${"🟩".repeat(Math.min(score, 12))}${score > 12 ? ` +${score - 12}` : ""}\n${score} Bitcoin ${score === 1 ? "call" : "calls"} in a row. Can you beat my streak?`;
   useEffect(() => {
     dialog.current?.showModal();
     let stopped = false,
@@ -107,7 +107,7 @@ export default function ScoreShare({
           width={1200}
           height={630}
           unoptimized
-          alt={`${score} Bitcoin ${score === 1 ? "move" : "moves"} caught. Can you beat it?`}
+          alt={`${score} Bitcoin ${score === 1 ? "call" : "calls"} called correctly. Can you beat it?`}
           className="score-image"
         />
       ) : (

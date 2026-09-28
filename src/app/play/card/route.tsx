@@ -29,7 +29,7 @@ export async function GET(request: Request) {
           }}
         >
           <span>BITCOIN / IN REAL LIFE</span>
-          <span>LIVE · 5 SECOND ROUNDS</span>
+          <span>UP / FLAT / DOWN · 5 SECONDS</span>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 45 }}>
           <span
@@ -45,7 +45,7 @@ export async function GET(request: Request) {
           </span>
           <div style={{ display: "flex", flexDirection: "column" }}>
             <span style={{ fontSize: 62, fontWeight: 700, lineHeight: 1.05 }}>
-              {score === 1 ? "move caught." : "moves caught."}
+              {score === 1 ? "right call." : "right calls."}
             </span>
             <span style={{ fontSize: 62, fontWeight: 700, lineHeight: 1.05 }}>
               Can you beat it?

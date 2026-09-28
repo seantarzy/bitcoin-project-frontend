@@ -9,7 +9,7 @@ export function cleanTrades(raw) {
     )
     .sort((a, b) => a.time - b.time);
 }
-export function makeOffer(trades, streak, now, previous) {
+export function makeOffer(trades, streak, now) {
   const last = trades.at(-1);
   if (!last || now - last.time > 5000 || last.time > now + 2000)
     throw new Error("Market feed is delayed. Try again shortly.");
@@ -26,31 +26,15 @@ export function makeOffer(trades, streak, now, previous) {
   if (!moves.length)
     throw new Error("Market is warming up. Try again shortly.");
   const typical = moves[Math.floor(moves.length * 0.7)];
-  let halfWidth =
-    Math.round(
-      Math.max(0.5, typical * 2.8 * Math.max(0.08, Math.pow(0.8, streak))) *
-        100,
-    ) / 100;
-  // A winning run must visibly get harder even if market volatility rises.
-  if (streak > 0 && previous?.halfWidth) {
-    const cap =
-      previous.outcome === "win"
-        ? previous.halfWidth * 0.8
-        : previous.halfWidth;
-    halfWidth = Math.max(0.5, Math.min(halfWidth, Math.floor(cap * 100) / 100));
-  }
-  const chartHalfSpan =
-    streak > 0 && previous?.chartHalfSpan
-      ? previous.chartHalfSpan
-      : Math.ceil(Math.max(halfWidth * 2.2, 2) * 100) / 100;
+  const flatHalfWidth = Math.max(0.01, Math.round(typical * 0.15 * 100) / 100);
   return {
     anchor: last.price,
-    halfWidth,
-    chartHalfSpan,
+    flatHalfWidth,
+    chartHalfSpan: Math.max(5, Math.ceil(typical * 4 * 100) / 100),
     forecastMs: FORECAST_MS,
     bufferMs: BUFFER_MS,
     expiresAt: now + 30000,
-    rulesVersion: 2,
+    rulesVersion: 3,
   };
 }
 export function settlement(trades, round, now) {
@@ -87,10 +71,23 @@ export function settlement(trades, round, now) {
   }
   total += price * (round.endsAt - time);
   const settledPrice = total / 1000;
+  // Flat owns both boundaries, so every finish has exactly one outcome.
+  const actualDirection = directionAt(
+    settledPrice,
+    round.anchor,
+    round.flatHalfWidth,
+  );
   return {
     outcome:
-      settledPrice >= round.low && settledPrice <= round.high ? "win" : "miss",
+      round.rulesVersion === 3
+        ? actualDirection === round.direction
+          ? "win"
+          : "miss"
+        : settledPrice >= round.low && settledPrice <= round.high
+          ? "win"
+          : "miss",
     settledPrice,
+    ...(round.rulesVersion === 3 ? { actualDirection } : {}),
   };
 }
 export async function marketTrades() {
@@ -103,4 +100,12 @@ export async function marketTrades() {
   );
   if (!r.ok) throw new Error("Market feed is unavailable. Please try again.");
   return cleanTrades(await r.json());
+}
+
+export function directionAt(price, anchor, flatHalfWidth) {
+  // Compare in integer cents to avoid floating-point boundary surprises.
+  const cents = Math.round(price * 100);
+  const low = Math.round((anchor - flatHalfWidth) * 100);
+  const high = Math.round((anchor + flatHalfWidth) * 100);
+  return cents > high ? "up" : cents < low ? "down" : "flat";
 }
