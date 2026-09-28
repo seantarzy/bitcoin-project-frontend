@@ -13,11 +13,12 @@ const history = () =>
     time: NOW - (120 - i) * 1000,
     price: 80000 + Math.sin(i / 4) * 10,
   }));
-test("flat zone uses volatility, stays independent of streak, and keeps a cent floor", () => {
+test("free-win zone stays at one cent at every streak", () => {
   const easy = makeOffer(history(), 0, NOW),
     hard = makeOffer(history(), 8, NOW);
   assert.equal(easy.flatHalfWidth, hard.flatHalfWidth);
-  assert.equal(easy.rulesVersion, 3);
+  assert.equal(easy.rulesVersion, 4);
+  assert.equal(easy.flatHalfWidth, 0.01);
   assert.equal(
     makeOffer(
       history().map((t) => ({ ...t, price: 80000 })),
@@ -109,6 +110,10 @@ test("server locks once, resumes active rounds, settles once and ignores submitt
   let r = await (await h.post({ action: "prepare", streak: 999 })).json();
   assert.equal(r.streak, 0);
   const id = r.round.id;
+  assert.equal(
+    (await h.post({ action: "lock", id, direction: "flat" })).status,
+    400,
+  );
   assert.equal((await h.post({ action: "lock", id, center: 0 })).status, 400);
   r = await (
     await h.post({
@@ -152,7 +157,7 @@ test("expired offers, cross-origin requests and concurrent updates cannot lock",
   let r = await (await h.post({ action: "prepare" })).json();
   h.advance(31000);
   assert.equal(
-    (await h.post({ action: "lock", id: r.round.id, direction: "flat" }))
+    (await h.post({ action: "lock", id: r.round.id, direction: "down" }))
       .status,
     409,
   );
@@ -164,7 +169,7 @@ test("expired offers, cross-origin requests and concurrent updates cannot lock",
       await other.post({
         action: "lock",
         id: r.round.id,
-        direction: "flat",
+        direction: "down",
       })
     ).status,
     503,
@@ -206,7 +211,7 @@ test("settlement waits briefly for delayed REST coverage rather than voiding imm
   );
 });
 
-test("each cent belongs to exactly one direction and flat owns its boundaries", () => {
+test("flat and both cent boundaries award either choice a win", () => {
   for (const [price, expected] of [
     [99.98, "down"],
     [99.99, "flat"],
@@ -217,14 +222,14 @@ test("each cent belongs to exactly one direction and flat owns its boundaries", 
     [100.016, "up"],
   ]) {
     assert.equal(directionAt(price, 100, 0.01), expected);
-    for (const direction of ["up", "flat", "down"]) {
+    for (const direction of ["up", "down"]) {
       const result = settlement(
         [
           { time: NOW - 1500, price },
           { time: NOW, price: 999 },
         ],
         {
-          rulesVersion: 3,
+          rulesVersion: 4,
           anchor: 100,
           flatHalfWidth: 0.01,
           direction,
@@ -233,7 +238,10 @@ test("each cent belongs to exactly one direction and flat owns its boundaries", 
         NOW + 2000,
       );
       assert.equal(result.actualDirection, expected);
-      assert.equal(result.outcome, direction === expected ? "win" : "miss");
+      assert.equal(
+        result.outcome,
+        direction === expected || expected === "flat" ? "win" : "miss",
+      );
     }
   }
 });
@@ -246,7 +254,7 @@ test("lock takes a fresh server anchor and ignores client anchor and score", asy
     await h.post({
       action: "lock",
       id: offer.round.id,
-      direction: "flat",
+      direction: "down",
       anchor: 1,
       streak: 999,
     })
@@ -264,13 +272,13 @@ test("direction mode archives old scores and locked rounds before starting fresh
   assert.equal(migrated.legacyBest, 9);
   assert.equal(migrated.best, 0);
   assert.equal(migrated.streak, 0);
-  assert.equal(migrated.rulesVersion, 3);
+  assert.equal(migrated.rulesVersion, 4);
   const other = harness();
   const offer = await (await other.post({ action: "prepare" })).json();
   await other.post({
     action: "lock",
     id: offer.round.id,
-    direction: "flat",
+    direction: "down",
   });
   Object.assign(other.state(), { rulesVersion: 1, best: 9, streak: 4 });
   const active = await (await other.post({ action: "prepare" })).json();
@@ -278,4 +286,45 @@ test("direction mode archives old scores and locked rounds before starting fresh
   assert.equal(active.best, 0);
   assert.equal(active.legacyRound.phase, "locked");
   assert.equal(active.legacyBests[1], 9);
+});
+
+test("flat finish increments either server streak exactly once", async () => {
+  for (const direction of ["up", "down"]) {
+    const h = harness();
+    const offer = await (await h.post({ action: "prepare" })).json();
+    h.advance(1000);
+    await h.post({ action: "lock", id: offer.round.id, direction });
+    h.advance(8000);
+    const result = await (
+      await h.post({ action: "settle", id: offer.round.id })
+    ).json();
+    assert.equal(result.round.actualDirection, "flat");
+    assert.equal(result.round.outcome, "win");
+    assert.equal(result.streak, 1);
+    const again = await (
+      await h.post({ action: "settle", id: offer.round.id })
+    ).json();
+    assert.equal(again.streak, 1);
+  }
+});
+
+test("already-issued version 3 rounds retain their original flat rules", () => {
+  const trades = [
+    { time: NOW - 1500, price: 100 },
+    { time: NOW, price: 100 },
+  ];
+  const round = {
+    rulesVersion: 3,
+    endsAt: NOW,
+    anchor: 100,
+    flatHalfWidth: 0.01,
+  };
+  assert.equal(
+    settlement(trades, { ...round, direction: "up" }, NOW + 2000).outcome,
+    "miss",
+  );
+  assert.equal(
+    settlement(trades, { ...round, direction: "flat" }, NOW + 2000).outcome,
+    "win",
+  );
 });

@@ -50,7 +50,7 @@ export const createGame =
           throw new Error("Another tab updated this game. Reload to resume.");
       };
       if (body.action === "prepare") {
-        if (run.rulesVersion !== 3) {
+        if (run.rulesVersion !== 4) {
           run.legacyBests = {
             ...run.legacyBests,
             [run.rulesVersion || 1]: run.best || 0,
@@ -60,7 +60,7 @@ export const createGame =
           run.streak = 0;
           run.best = 0;
           run.round = null;
-          run.rulesVersion = 3;
+          run.rulesVersion = 4;
         }
         if (run.round?.phase === "locked") return reply(run);
         const trades = await getTrades(),
@@ -91,15 +91,15 @@ export const createGame =
         if (run.round.phase === "locked" || run.round.phase === "done")
           return reply(run);
         const r = run.round;
-        if (r.rulesVersion !== 3)
+        if (r.rulesVersion !== 4)
           return reply(
-            { error: "The game has changed. Reload to play Up, Flat or Down." },
+            { error: "The game has changed. Reload to play Up or Down." },
             409,
           );
         if (r.expiresAt < clock())
           return reply({ error: "Round expired. Refresh to play." }, 409);
-        if (!["up", "flat", "down"].includes(body.direction))
-          return reply({ error: "Choose Up, Flat or Down." }, 400);
+        if (!["up", "down"].includes(body.direction))
+          return reply({ error: "Choose Up or Down." }, 400);
         const trades = await getTrades();
         const now = clock(),
           latest = trades.at(-1);

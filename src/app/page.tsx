@@ -5,7 +5,7 @@ import PurchasingPower from "./components/PurchasingPower";
 export const metadata: Metadata = {
   title: "Catch the next move · Play live Bitcoin",
   description:
-    "Up, Flat, or Down? Play the free five-second Bitcoin game, build your streak, then explore the daily find and what Bitcoin can buy.",
+    "Up or Down? Play the free five-second Bitcoin game, build your streak, then explore the daily find and what Bitcoin can buy.",
   openGraph: {
     title: "Catch the next move · Play live Bitcoin",
     description:

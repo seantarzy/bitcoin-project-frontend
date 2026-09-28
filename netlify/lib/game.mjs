@@ -26,7 +26,7 @@ export function makeOffer(trades, streak, now) {
   if (!moves.length)
     throw new Error("Market is warming up. Try again shortly.");
   const typical = moves[Math.floor(moves.length * 0.7)];
-  const flatHalfWidth = Math.max(0.01, Math.round(typical * 0.15 * 100) / 100);
+  const flatHalfWidth = 0.01;
   return {
     anchor: last.price,
     flatHalfWidth,
@@ -34,7 +34,7 @@ export function makeOffer(trades, streak, now) {
     forecastMs: FORECAST_MS,
     bufferMs: BUFFER_MS,
     expiresAt: now + 30000,
-    rulesVersion: 3,
+    rulesVersion: 4,
   };
 }
 export function settlement(trades, round, now) {
@@ -79,15 +79,16 @@ export function settlement(trades, round, now) {
   );
   return {
     outcome:
-      round.rulesVersion === 3
-        ? actualDirection === round.direction
+      round.rulesVersion >= 3
+        ? actualDirection === round.direction ||
+          (round.rulesVersion >= 4 && actualDirection === "flat")
           ? "win"
           : "miss"
         : settledPrice >= round.low && settledPrice <= round.high
           ? "win"
           : "miss",
     settledPrice,
-    ...(round.rulesVersion === 3 ? { actualDirection } : {}),
+    ...(round.rulesVersion >= 3 ? { actualDirection } : {}),
   };
 }
 export async function marketTrades() {

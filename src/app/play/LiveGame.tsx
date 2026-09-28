@@ -6,7 +6,6 @@ import {
   ArrowUpRight,
   ArrowUp,
   ArrowDown,
-  Minus,
   Flame,
   Share2,
   Trophy,
@@ -16,7 +15,7 @@ import { chartSeries, DISPLAY_DELAY_MS } from "@/services/gameChart";
 import ScoreShare from "./ScoreShare";
 import "./game.css";
 type Tick = { time: number; price: number };
-type Direction = "up" | "flat" | "down";
+type Direction = "up" | "down";
 type Round = {
   id: string;
   phase: "ready" | "locked" | "done";
@@ -29,7 +28,7 @@ type Round = {
   startsAt?: number;
   endsAt?: number;
   direction?: Direction;
-  actualDirection?: Direction;
+  actualDirection?: Direction | "flat";
   outcome?: "win" | "miss" | "void";
   settledPrice?: number;
   reason?: string;
@@ -88,7 +87,7 @@ export default function LiveGame({
     if (data.round.phase === "done" && seen.current !== data.round.id) {
       seen.current = data.round.id;
       track("game_round_result", {
-        method: "direction_5s",
+        method: "direction_freebie_5s",
         outcome: data.round.outcome,
         category: data.round.direction,
       });
@@ -113,7 +112,7 @@ export default function LiveGame({
         apply(data);
         if (action === "lock")
           track("game_round_locked", {
-            method: "direction_5s",
+            method: "direction_freebie_5s",
             category: direction,
           });
       } catch (e) {
@@ -129,7 +128,7 @@ export default function LiveGame({
   );
   useEffect(() => {
     track("game_view", {
-      method: "direction_5s",
+      method: "direction_freebie_5s",
       placement: embedded ? "homepage" : "play",
     });
     void request("prepare");
@@ -262,7 +261,7 @@ export default function LiveGame({
   const outcome = round?.outcome;
   const zones: [Direction, number, number][] = [
     ["up", 30, upperY - 30],
-    ["flat", upperY, Math.max(1, lowerY - upperY)],
+
     ["down", lowerY, 310 - lowerY],
   ];
   const Shell = embedded ? "section" : "main";
@@ -292,7 +291,7 @@ export default function LiveGame({
           Catch the <br />
           <em>next move.</em>
         </h1>
-        <p>Up, flat, or down? Call Bitcoin’s next five seconds.</p>
+        <p>Up or down? Call Bitcoin’s next five seconds.</p>
       </div>
       {challengeTarget !== null && (
         <div className="game-challenge" role="status">
@@ -349,7 +348,7 @@ export default function LiveGame({
               </>
             ) : (
               <>
-                <span className="direction-glyph">↗ → ↘</span>
+                <span className="direction-glyph">↗ ↘</span>
                 <span>{ready ? "MAKE YOUR CALL" : "YOUR NEXT MOVE"}</span>
               </>
             )}
@@ -360,7 +359,7 @@ export default function LiveGame({
           viewBox="0 0 800 350"
           preserveAspectRatio="none"
           role="img"
-          aria-label="Live chart with Up, Flat, and Down zones. Use the matching buttons below to make a prediction."
+          aria-label="Live chart with Up and Down zones. Use the matching buttons below to make a prediction."
         >
           <defs>
             <clipPath id="direction-plot">
@@ -470,8 +469,7 @@ export default function LiveGame({
             {locked ? "FINISH" : "CHOOSE A ZONE"}
           </text>
           <text x="28" y="343" fill="#9baa93" fontSize="11">
-            FLAT = WITHIN {usd(flat)} OF{" "}
-            {ready ? "THE START PRICE" : "YOUR START PRICE"}
+            FLAT ±{usd(flat)} = FREE WIN
           </text>
         </svg>
         <div className="game-controls">
@@ -479,10 +477,10 @@ export default function LiveGame({
             <>
               <div className="direction-question">
                 <h2>Where will it finish?</h2>
-                <p>Tap a shaded area or pick your call below.</p>
+                <p>Pick Up or Down. Flat gives either choice a free win.</p>
               </div>
               <div className="direction-options">
-                {(["up", "flat", "down"] as Direction[]).map((direction) => (
+                {(["up", "down"] as Direction[]).map((direction) => (
                   <button
                     key={direction}
                     className={`direction-option option-${direction} ${hover === direction ? "option-active" : ""}`}
@@ -495,18 +493,14 @@ export default function LiveGame({
                   >
                     {direction === "up" ? (
                       <ArrowUp size={23} />
-                    ) : direction === "down" ? (
-                      <ArrowDown size={23} />
                     ) : (
-                      <Minus size={23} />
+                      <ArrowDown size={23} />
                     )}
                     <strong>{labels[direction]}</strong>
                     <small>
                       {direction === "up"
                         ? `Above ${usd(reference + flat)}`
-                        : direction === "down"
-                          ? `Below ${usd(reference - flat)}`
-                          : `±${usd(flat)} of start`}
+                        : `Below ${usd(reference - flat)}`}
                     </small>
                   </button>
                 ))}
@@ -543,7 +537,7 @@ export default function LiveGame({
                     : "Checking the official finish…"}
               </h2>
               <p>
-                Start: <strong>{usd(round.anchor)}</strong> · Flat:{" "}
+                Start: <strong>{usd(round.anchor)}</strong> · Free-win zone:{" "}
                 {usd(round.anchor - flat)} – {usd(round.anchor + flat)}
                 <br />
                 Your start price stays fixed until the round ends.
@@ -554,7 +548,9 @@ export default function LiveGame({
             <div className={`game-result result-${outcome}`} aria-live="polite">
               <span className="result-label">
                 {outcome === "win"
-                  ? "CALLED IT"
+                  ? round.actualDirection === "flat"
+                    ? "FLAT FINISH · FREE WIN"
+                    : "CALLED IT"
                   : outcome === "miss"
                     ? "WRONG WAY"
                     : "ROUND VOIDED"}
@@ -568,7 +564,9 @@ export default function LiveGame({
               </h2>
               <p>
                 {round.reason ||
-                  `You called ${labels[round.direction!]}. It finished ${labels[round.actualDirection!]}.`}
+                  (round.actualDirection === "flat"
+                    ? "Bitcoin finished flat. Free win—your streak grows!"
+                    : `You called ${labels[round.direction!]}. It finished ${labels[round.actualDirection!]}.`)}
                 <br />
                 {round.settledPrice !== undefined &&
                   `Start ${usd(round.anchor)} → Finish ${usd(round.settledPrice)}`}
@@ -577,7 +575,10 @@ export default function LiveGame({
                 className="game-primary"
                 disabled={busy}
                 onClick={() => {
-                  track("game_replay", { method: "direction_5s", outcome });
+                  track("game_replay", {
+                    method: "direction_freebie_5s",
+                    outcome,
+                  });
                   void request("prepare");
                 }}
               >
@@ -599,7 +600,7 @@ export default function LiveGame({
               <h2>
                 {busy ? "Connecting to the market…" : "Ready when you are."}
               </h2>
-              <p>Real Bitcoin. Three choices. Five seconds.</p>
+              <p>Real Bitcoin. Two choices. Five seconds.</p>
               {!busy && (
                 <button
                   className="game-primary"
@@ -629,7 +630,7 @@ export default function LiveGame({
           <div className="game-how">
             <div>
               <span>01 / CALL IT</span>
-              <p>Up, flat, or down? Tap your prediction to lock it.</p>
+              <p>Up or down? Tap your prediction to lock it.</p>
             </div>
             <div>
               <span>02 / WATCH</span>
@@ -671,7 +672,7 @@ export default function LiveGame({
         </>
       )}
       <details className="game-rules">
-        <summary>How Up, Flat, Down and fair play work</summary>
+        <summary>How Up, Down and free wins work</summary>
         <p>
           Reference market: Coinbase Exchange BTC/USD. Before you choose, zones
           follow the smoothed live price. When the server accepts your choice it
@@ -680,13 +681,12 @@ export default function LiveGame({
           five-second forecast.
         </p>
         <p>
-          Flat means within the displayed dollar tolerance of the start price,
-          including both boundaries and an exactly unchanged price. Up is
-          strictly above that zone; Down is strictly below it. The tolerance is
-          15% of a recent typical five-second move, with a one-cent minimum. It
-          adapts to the market, never to your streak. The official finish is the
-          time-weighted last-trade price over the final second, rounded to
-          cents. Every verified result has exactly one outcome.
+          Flat means the official finish is within one cent of the start price,
+          including both boundaries. A flat finish counts as a win whether you
+          picked Up or Down. Outside that tiny zone, only the correct direction
+          wins. The official finish is the time-weighted last-trade price over
+          the final second, rounded to cents. The rules stay the same at every
+          streak length.
         </p>
         <p>
           The chart keeps its 800ms visual buffer to smoothly interpolate
