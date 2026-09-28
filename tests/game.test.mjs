@@ -174,3 +174,18 @@ test("abandoned rounds reset the streak without depending on market availability
   assert.equal(result.streak, 0);
   assert.equal(h.calls(), calls);
 });
+
+test("settlement waits briefly for delayed REST coverage rather than voiding immediately", () => {
+  const trades = [
+    { time: NOW - 1500, price: 100 },
+    { time: NOW - 500, price: 102 },
+  ];
+  const round = { endsAt: NOW, low: 100, high: 103 };
+  assert.equal(settlement(trades, round, NOW + 2000), null);
+  assert.equal(settlement(trades, round, NOW + 9000).outcome, "void");
+  assert.equal(
+    settlement([...trades, { time: NOW + 500, price: 101 }], round, NOW + 4000)
+      .outcome,
+    "win",
+  );
+});

@@ -45,6 +45,8 @@ export function settlement(trades, round, now) {
   const start = round.endsAt - 1000;
   const before = trades.filter((t) => t.time <= start).at(-1);
   const after = trades.find((t) => t.time >= round.endsAt);
+  // The REST trade feed can lag the live WebSocket; wait for final coverage.
+  if (before && !after && now < round.endsAt + 8000) return null;
   if (
     !before ||
     !after ||
@@ -75,10 +77,10 @@ export function settlement(trades, round, now) {
 }
 export async function marketTrades() {
   const r = await fetch(
-    "https://api.exchange.coinbase.com/products/BTC-USD/trades?limit=1000",
+    `https://api.exchange.coinbase.com/products/BTC-USD/trades?limit=1000&_=${Date.now()}`,
     {
       signal: AbortSignal.timeout(6000),
-      headers: { Accept: "application/json" },
+      headers: { Accept: "application/json", "Cache-Control": "no-cache" },
     },
   );
   if (!r.ok) throw new Error("Market feed is unavailable. Please try again.");
